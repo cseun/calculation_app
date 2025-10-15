@@ -11,23 +11,7 @@ typedef enum {
 } ProcessRequestStatus;
 
 ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, const char* context);
-
-// validateExpression
-// 함수 정의: 사용자 입력 값을 필터링하며, 오류가 발생하는 경우 처리 요청 상태를 반환한다.
-// - 잘못된 입력값 필터링
-//	1) 앞 연산자 제거
-//		- 연산자가 열림 괄호일 경우 미제거
-//	2) 뒤 연산자 제거
-//		- 연산자가 닫힘 괄호일 경우 미제거
-//	3) 저장된 값이 있는지 체크
-//		- 저장된 값이 없을 경우 재시작 요청 상태를 반환한다.
-//	4) 연산자 연속 입력 오류 체크
-//		- 잘못된 입력이였을 경우 재시작 요청 상태를 반환한다.
-//  5) TODO 괄호가 쌍을 이루는지 오류 체크
-//		- 열림 닫침 (, ) 괄호가 쌍으로 있어야한다.
-//		- 잘못된 입력이였을 경우 재시작 요청 상태를 반환한다.
-// - 정상적으로 처리되었을 경우 다음 로직 실행 상태를 반환한다.
-ProcessRequestStatus validateExpression(int* exprLen, char* expression);
+ProcessRequestStatus validateExpression(int *exprLen, char* expression);
 
 // parseExpression
 // 함수 정의: 연산식을 받아서 연산자와 피연산자를 연산 순서대로 각각 나눠담는 함수
@@ -45,12 +29,11 @@ ProcessRequestStatus parseExpression(int numbers[], char operators[], int* numbe
 int calculate(char* expression);
 
 void* dynamicArrays[3] = { NULL, NULL, NULL };
+const char* validOperators = "*/+-()";
+const char* exits = "xX";
 
 int main()
 {
-	const char* validOperators = "*/+-"; // TODO ( 와 ) 추가 하기
-	const char* exits = "xX";
-
 	boolean isFirst;
 	int ch;
 	
@@ -74,6 +57,7 @@ int main()
 	while (1)
 	{
 		printf("계산할 연산식을 입력하시오(종료문자 x 혹은 mX) ex) 1+2*3\n");
+		printf("[ 설명 ]");
 		printf("- 가능한 연산문자 +, -, *, /\n");
 		printf("- 허용된 연산문자 외의 문자는 제외하고 계산됩니다. \n");
 		printf("- 첫 글자가 종료문자(X, X)인 경우 프로그램이 종료됩니다. \n:");
@@ -106,7 +90,6 @@ int main()
 					exprSize *= 2;
 					char* temp = (char*)realloc(expression, sizeof(char) * exprSize);
 					if (!temp) {
-						printf("메모리 재할당 실패. 관리자 문의 필요\n");
 						executeProgramControl(STATUS_FORCE_EXIT, "메모리 재할당 실패. 관리자 문의 필요\n");
 					}
 					expression = temp;
@@ -130,32 +113,9 @@ int main()
 
 		exprLen = strlen(expression);
 
-		// 앞 연산자 제거
-		while (exprLen > 0 && strchr(validOperators, expression[0])) {
-			if (expression[0] == '(') break;
-			memmove(expression, expression + 1, strlen(expression) + 1);
-			exprLen--;
-		}
-
-		// 뒤 연산자 제거
-		while (exprLen > 0 && strchr(validOperators, expression[exprLen - 1])) {
-			if (expression[exprLen - 1] == ')') break;
-			expression[--exprLen] = '\0';
-		}
-
-		// 저장된 값이 없음 오류
-		if (exprLen == 0) {
-			executeProgramControl(STATUS_RESTART, "계산식 정리시 계산식이 올바르지 않습니다. 다시 입력해주세요.\n\n");
-			continue;
-		}
-
-		// 연산자 연속 오류
-		for (int exprIdx = 1; exprIdx < exprLen; ++exprIdx) {
-			if (strchr(validOperators, expression[exprIdx - 1]) && strchr(validOperators, expression[exprIdx])) {
-				executeProgramControl(STATUS_RESTART, "계산식 정리 중 오타로 인한 연산자 연속. 재입력 요청\n\n");
-			}
-		}
-
+		// 연산 가능한 수식인지 확인 및 필터링
+		ProcessRequestStatus status = validateExpression(&exprLen, expression);
+		if (status == STATUS_RESTART) continue;
 
 		// 숫자 및 연산자 분리		
 		numbers = (int*)malloc(sizeof(int) * exprLen);
@@ -202,7 +162,7 @@ int main()
 			continue;
 		}
 
-		// [7번] === 계산식 출력 및 계산 ===
+		// === 계산식 출력 및 계산 ===
 		printf("필터링된 계산식: %s\n", expression);
 
 		// 계산 처리
@@ -283,7 +243,7 @@ ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, const ch
 		printf("%s\n", context);
 	}
 
-	// 동적 메모리 해제
+	// 동적 메모리 해제 (TODO 이후 가변적으로 처리)
 	for (int i = 0; i < 3; i++) {
 		if (dynamicArrays[i]) {
 			free(dynamicArrays[i]);
@@ -309,7 +269,7 @@ ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, const ch
 
 		case STATUS_RESTART:
 			// 프로그램 재시작
-			printf("프로그램 재시작\n\n");
+			printf("=== 프로그램 재시작 ===\n");
 			return STATUS_RESTART;
 
 		default: 
@@ -319,8 +279,54 @@ ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, const ch
 
 ProcessRequestStatus validateExpression(int* exprLen, char* expression)
 {
+	// 앞 연산자 제거
+	while (*exprLen > 0 && strchr(validOperators, expression[0])) {
+		if (expression[0] == '(') break;
+		memmove(expression, expression + 1, strlen(expression));
+		(*exprLen)--;
+	}
+
+	// 뒤 연산자 제거
+	while (*exprLen > 0 && strchr(validOperators, expression[*exprLen - 1])) {
+		if (expression[*exprLen - 1] == ')') break;
+		expression[--(*exprLen)] = '\0';
+	}
+
+	// 저장된 값이 없음 오류
+	if (*exprLen == 0) {
+		return executeProgramControl(STATUS_RESTART, "계산식 정리 중 계산식이 비어 있습니다. 다시 입력해주세요.\n\n");
+	}
+
+	// 연산자 연속 오류 검사
+	for (int i = 1; i < *exprLen; ++i) {
+		if (strchr(validOperators, expression[i - 1]) && strchr(validOperators, expression[i])) {
+			return executeProgramControl(STATUS_RESTART, "계산식 정리 중 오타로 인한 연산자 연속. 재입력 요청\n\n");
+		}
+	}
+
+	// 괄호 검사
+	int balance = 0;
+	for (int i = 0; i < *exprLen; ++i) {
+		if (expression[i] == '(')
+			balance++;
+		else if (expression[i] == ')')
+			balance--;
+
+		// 닫는 괄호가 더 많으면 바로 오류
+		if (balance < 0) {
+			return executeProgramControl(STATUS_RESTART,
+				"닫는 괄호 ')'가 너무 많습니다. 수식을 다시 입력해주세요.\n\n");
+		}
+	}
+
+	if (balance != 0) {
+		return executeProgramControl(STATUS_RESTART, "괄호 짝이 맞지 않습니다. 수식을 다시 입력해주세요.\n\n");
+	}
+
+	return STATUS_PROCESS;
 
 }
+
 ProcessRequestStatus parseExpression(int numbers[], char operators[], int* numberIdx, int* operatorIdx)
 {
 
