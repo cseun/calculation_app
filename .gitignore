@@ -1,0 +1,10 @@
+# Visual Studio 캐시
+.vs/
+
+# 사용자 환경 파일 
+*.vcxproj.user
+
+# 빌드 폴더
+Debug/
+Release/
+x64/
