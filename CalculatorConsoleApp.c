@@ -10,26 +10,7 @@ typedef enum {
 	STATUS_RESTART       // 프로그램 재시작
 } ProcessRequestStatus;
 
-const char* validOperators = "*/+-"; // TODO ( 와 ) 추가 하기
-const char* exits = "xX";
-
-// executeProgramControl
-// 함수 정의: 프로그램 처리 요청 상태(ProcessRequestStatus)를 받아 각 상태에 따라 프로그램 종료 혹은 재 실행.
-//	- 프로그램 재실행은 함수 내에서 처리가 안되므로 재시작 값 반환
-//	- 프로그램 처리 요청 상태(종료/재시작)와, 출력문을 받고 처리한다.
-//		- 공통: 동적 메모리 해제를 통한 메모리 누수 차단	
-//		- 프로그램 재시작: 
-//			1) 재시작 문구 출력
-//			2) 프로그램 재시작 상태 값 ProcessRequestStatus::STATUS_RESTART 반환
-//		- 프로그램 비정상 종료
-//			1) 종료 문구 출력
-//			2) 종료 딜레이 (sleep(2000))
-//			3) 종료 exit(1);
-//		- 프로그램 정상 종료
-//			1) 종료 문구 출력
-//			2) 종료 딜레이 (sleep(2000))
-//			3) 종료 exit(0);
-ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, char* context);
+ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, const char* context);
 
 // validateExpression
 // 함수 정의: 사용자 입력 값을 필터링하며, 오류가 발생하는 경우 처리 요청 상태를 반환한다.
@@ -63,40 +44,59 @@ ProcessRequestStatus parseExpression(int numbers[], char operators[], int* numbe
 //	3) 덧셈 뺄셈 계산 진헹 
 int calculate(char* expression);
 
+void* dynamicArrays[3] = { NULL, NULL, NULL };
+
 int main()
 {
+	const char* validOperators = "*/+-"; // TODO ( 와 ) 추가 하기
+	const char* exits = "xX";
+
+	boolean isFirst;
+	int ch;
+	
+	char* context;
+
+	size_t exprLen;
+	size_t exprSize;
+	char* expression;
+	int* numbers;
+	char* operators;
+
+	int numberIdx;
+	int operatorIdx;
+	char* expressionPtr = NULL;
+
+	int numberCount;
+	int operatorCount;
 
 	printf("== 계산기 프로그램 ==\n");
 
 	while (1)
 	{
-	HERE:
 		printf("계산할 연산식을 입력하시오(종료문자 x 혹은 mX) ex) 1+2*3\n");
 		printf("- 가능한 연산문자 +, -, *, /\n");
 		printf("- 허용된 연산문자 외의 문자는 제외하고 계산됩니다. \n");
 		printf("- 첫 글자가 종료문자(X, X)인 경우 프로그램이 종료됩니다. \n:");
 
-		boolean isFirst = TRUE;
-		char* validOperators = "*/+-";
-		char* exits = "xX";
-		size_t exprLen = 0;
-		size_t exprSize = 100;
+		isFirst = TRUE;
+		ch = 0;
+		context = "";
+		exprLen = 0;
+		exprSize = 100;
 
-		char* expression = (char*)malloc(sizeof(char) * exprSize);
+		// ===== 입력값 메모리 할당 =====
+		expression = (char*)malloc(sizeof(char) * exprSize);
 		if (!expression) {
-			printf("메모리 할당 실패. 관리자 문의 필요\n");
-			return 0;
+			executeProgramControl(STATUS_FORCE_EXIT,"메모리 할당 실패. 관리자 문의 필요\n");
 		}
+		dynamicArrays[0] = expression;
 
-		// [4-2] === 사용자 입력 및 저장 ===
-		int ch = 0;
+		// ===== 입력 처리 =====
 		while ((ch = getchar()) != '\n' && ch != EOF) {
 			// 첫 문자 종료키 처리
 			if (isFirst) {
 				if (strchr(exits, ch)) {
-					printf("프로그램 종료\n");
-					Sleep(2000);
-					return 1;
+					executeProgramControl(STATUS_EXIT, "사용자 종료 요청");
 				}
 				isFirst = FALSE;
 			}
@@ -107,10 +107,10 @@ int main()
 					char* temp = (char*)realloc(expression, sizeof(char) * exprSize);
 					if (!temp) {
 						printf("메모리 재할당 실패. 관리자 문의 필요\n");
-						free(expression);
-						goto HERE;
+						executeProgramControl(STATUS_FORCE_EXIT, "메모리 재할당 실패. 관리자 문의 필요\n");
 					}
 					expression = temp;
+					dynamicArrays[0] = expression; // realloc 후 다시 대입
 				}
 				expression[exprLen++] = (char)ch;
 			}
@@ -118,58 +118,59 @@ int main()
 		expression[exprLen] = '\0';
 
 		if (ch == EOF && ferror(stdin)) {
-			printf("입력 값 읽어오는 중 오류 발생. 재입력 해주세요.");
 			clearerr(stdin);
-			free(expression);
+			executeProgramControl(STATUS_RESTART, "입력 값 읽어오는 중 오류 발생.재입력 해주세요.\n");
 			continue;
 		}
 
 		if (exprLen == 0) {
-			printf("저장된 계산식이 없습니다. 다시 입력해주세요.\n\n");
+			executeProgramControl(STATUS_RESTART, "저장된 계산식이 없습니다. 다시 입력해주세요.\n\n");
 			continue;
 		}
 
-		// [5번] === 저장된 계산식 정리 ===
 		exprLen = strlen(expression);
+
 		// 앞 연산자 제거
 		while (exprLen > 0 && strchr(validOperators, expression[0])) {
+			if (expression[0] == '(') break;
 			memmove(expression, expression + 1, strlen(expression) + 1);
 			exprLen--;
 		}
 
 		// 뒤 연산자 제거
 		while (exprLen > 0 && strchr(validOperators, expression[exprLen - 1])) {
+			if (expression[exprLen - 1] == ')') break;
 			expression[--exprLen] = '\0';
 		}
 
 		// 저장된 값이 없음 오류
 		if (exprLen == 0) {
-			printf("계산식 정리시 계산식이 올바르지 않습니다. 다시 입력해주세요.\n\n");
-			continue; //입력으로 돌아감
+			executeProgramControl(STATUS_RESTART, "계산식 정리시 계산식이 올바르지 않습니다. 다시 입력해주세요.\n\n");
+			continue;
 		}
 
 		// 연산자 연속 오류
 		for (int exprIdx = 1; exprIdx < exprLen; ++exprIdx) {
 			if (strchr(validOperators, expression[exprIdx - 1]) && strchr(validOperators, expression[exprIdx])) {
-				printf("계산식 정리 중 오타로 인한 연산자 연속. 재입력 요청\n\n");
-				goto HERE;
+				executeProgramControl(STATUS_RESTART, "계산식 정리 중 오타로 인한 연산자 연속. 재입력 요청\n\n");
 			}
 		}
 
+
 		// 숫자 및 연산자 분리		
-		int* numbers = (int*)malloc(sizeof(int) * exprLen);
-		char* operators = (char*)malloc(sizeof(char) * exprLen);
+		numbers = (int*)malloc(sizeof(int) * exprLen);
+		operators = (char*)malloc(sizeof(char) * exprLen);
 
 		if (!numbers || !operators) {
-			printf("메모리 할당 실패\n");
-			free(numbers);
-			free(operators);
-			goto HERE; // 입력으로 복귀
+			executeProgramControl(STATUS_RESTART, "메모리 할당 실패\n\n");
+			continue;
 		}
+		dynamicArrays[1] = numbers;
+		dynamicArrays[2] = operators;
 
-		int numberIdx = 0;
-		int operatorIdx = 0;
-		char* expressionPtr = expression;
+		numberIdx = 0;
+		operatorIdx = 0;
+		expressionPtr = expression;
 		while (*expressionPtr) { // 표현식이 존재할때 까지
 			char* endptr;
 			int num = strtol(expressionPtr, &endptr, 10);
@@ -193,11 +194,11 @@ int main()
 			}
 		}
 
-		int numberCount = numberIdx;
-		int operatorCount = operatorIdx;
+		numberCount = numberIdx;
+		operatorCount = operatorIdx;
 
 		if (numberCount < 2 || operatorCount < 1) {
-			printf("계산에 필요한 숫자 혹은 연산자가 부족. 재입력 해주세요.\n\n");
+			executeProgramControl(STATUS_RESTART, "계산에 필요한 숫자 혹은 연산자가 부족. 재입력 해주세요\n\n");
 			continue;
 		}
 
@@ -212,8 +213,8 @@ int main()
 				int b = numbers[i + 1];
 
 				if (operators[i] == '/' && b == 0) {
-					printf("0으로 나눌 수 없습니다\n\n");
-					goto HERE; //입력으로 돌아감
+					executeProgramControl(STATUS_RESTART, "0으로 나눌 수 없습니다\n\n");
+					continue;
 				}
 
 				// i 와 i+1 의 계산 결과값을 i에 저장
@@ -243,7 +244,7 @@ int main()
 
 		// 덧셈, 뺄셈 계산
 		int result = numbers[0];
-		for (int j = 0; j < operatorCount; j++) {
+		for (int i = 0; i < operatorCount; i++) {
 			if (operators[i] == '+') {
 				result += numbers[i + 1];
 			}
@@ -259,10 +260,63 @@ int main()
 	return 1;
 }
 
-ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, char* context)
-{
+// 함수 정의: 프로그램 처리 요청 상태(ProcessRequestStatus)를 받아 각 상태에 따라 프로그램 종료 혹은 재 실행.
+//	- 프로그램 재실행은 함수 내에서 처리가 안되므로 재시작 값 반환
+//	- 프로그램 처리 요청 상태(종료/재시작)와, 출력문을 받고 처리한다.
+//		- 공통: 동적 메모리 해제 및 null 초기화를 통한 메모리 누수 차단	
+//		- 프로그램 재시작: 
+//			1) 재시작 문구 출력
+//			2) 프로그램 재시작 상태 값 ProcessRequestStatus::STATUS_RESTART 반환
+//		- 프로그램 비정상 종료
+//			1) 종료 문구 출력
+//			2) 종료 딜레이 (sleep(2000))
+//			3) 종료 exit(1);
+//		- 프로그램 정상 종료
+//			1) 종료 문구 출력
+//			2) 종료 딜레이 (sleep(2000))
+//			3) 종료 exit(0);
 
+ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, const char* context)
+{
+	if (context)
+	{
+		printf("%s\n", context);
+	}
+
+	// 동적 메모리 해제
+	for (int i = 0; i < 3; i++) {
+		if (dynamicArrays[i]) {
+			free(dynamicArrays[i]);
+			dynamicArrays[i] = NULL;
+		}
+	}
+
+	switch (status)
+	{
+		case STATUS_FORCE_EXIT:
+			// 강제 종료 (오류)
+			printf("프로그램이 2초 후 강제 종료됩니다.");
+			Sleep(2000);
+			exit(1);
+			break;
+		
+		case STATUS_EXIT:
+			// 정상 종료
+			printf("프로그램이 2초 후 정상 종료됩니다.");
+			Sleep(2000);
+			exit(0);
+			break;
+
+		case STATUS_RESTART:
+			// 프로그램 재시작
+			printf("프로그램 재시작\n\n");
+			return STATUS_RESTART;
+
+		default: 
+			return STATUS_PROCESS;
+	}
 }
+
 ProcessRequestStatus validateExpression(int* exprLen, char* expression)
 {
 
