@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <Windows.h>
 #define _CRT_SECURE_NO_WARNINGS
-
+//123 + 2 * 2 + (3 + 2) -> 129 || (3+2) -> 3
 // enum, struct, static 변수
 typedef enum {
 	STATUS_PROCESS,		 // 다음 로직 실행 (정상 실행)
@@ -17,7 +17,8 @@ typedef struct {
 	char* operators;        // 연산자 배열
 	int  operatorLen;       // 연산자 개수
 } ExpressionData;
-void* dynamicArrays[3] = { NULL, NULL, NULL };	// 동적 배열 메모리 한번에 관리
+void* dynamicArrays[3] = { NULL, 
+NULL, NULL };	// 동적 배열 메모리 한번에 관리
 const char* validOperators = "*/+-()";
 const char* validBasicOperators = "*/+-";
 const char* exits = "xX";
@@ -36,8 +37,8 @@ int main()
 
 	while (1)
 	{
-		printf("계산할 연산식을 입력하시오(종료문자 x 혹은 mX) ex) 1+2*3\n");
 		printf("[ 설명 ]\n");
+		printf("계산할 연산식을 입력하시오(종료문자 x 혹은 mX) ex) 1+2*3\n");
 		printf("- 가능한 연산문자 +, -, *, /\n");
 		printf("- 허용된 연산문자 외의 문자는 제외하고 계산됩니다. \n");
 		printf("- 첫 글자가 종료문자(X, X)인 경우 프로그램이 종료됩니다. \n:");
@@ -111,20 +112,27 @@ int main()
 			0  // operatorLen
 		};
 		status = parseExpression(&data);
+
 		if (status == STATUS_RESTART) {
 			continue;
 		}
 
 		// === 계산식 출력 및 계산 ===
-		printf("필터링된 계산식: %s\n", expression);
+		printf("\n[계산 결과]\n");
+		printf("- 필터링된 계산식: %s\n", expression);
+		printf("-- 연산자:");
+        for (int i = 0; i < data.operatorLen; i++) printf("%c ", operators[i]);
+        printf("\n-- 피연산자:");
+        for (int i = 0; i < data.numberLen; i++) printf("%d ", numbers[i]);
+
 		int result = 0;
 		status = calculate(&data, &result);
 		if (status == STATUS_RESTART) {
 			continue;
 		}
 
-		printf("계산 결과: %d\n\n", result);
-
+		printf("\n==> 계산 결과: %d\n\n", result);
+		executeProgramControl(STATUS_RESTART, "");
 	}
 
 	return 1;
@@ -259,101 +267,80 @@ ProcessRequestStatus parseExpression(ExpressionData* data)
 	return STATUS_PROCESS;
 }
 
+int precedence(char op) {
+    if (op == '+' || op == '-') return 1;
+    if (op == '*' || op == '/') return 2;
+    return 0;
+}
+
+int applyOp(int a, int b, char op) {
+    switch (op) {
+    case '+': return a + b;
+    case '-': return a - b;
+    case '*': return a * b;
+    case '/': 
+        if (b == 0) {
+            printf("0으로 나눌 수 없습니다.\n");
+            return 0;
+        }
+        return a / b;
+    }
+    return 0;
+}
+
 ProcessRequestStatus calculate(ExpressionData* data, int* result)
 {
-	int i = 0;
-	// 괄호 계산
-	while (i < data->operatorLen) {
-		if (data->operators[i] == '(') {
-			int depth = 1;
-			int j = i + 1;
+	const char* s = data->expression;
+	int values[256]; int vTop = -1;
+	char ops[256]; int oTop = -1;
 
-			// 짝이 맞는 ')' 찾기
-			while (depth > 0) {
-				if (data->operators[j] == '(') {
-					depth++;
-				}
-				else if (data->operators[j] == ')') {
-					depth--;
-				}
-				j++;
+	for (int i = 0; s[i]; ) {
+		if (isspace((unsigned char)s[i])) { i++; continue; }
+
+		if (isdigit((unsigned char)s[i])) {
+			int val = 0;
+			while (isdigit((unsigned char)s[i])) {
+				val = val * 10 + (s[i] - '0');
+				i++;
 			}
-
-			// i~j-1 구간이 괄호 내부
-			ExpressionData inner = {
-				.expression = NULL,
-				.numbers = &data->numbers[i],
-				.numberLen = 0,
-				.operators = &data->operators[i + 1],
-				.operatorLen = 0
-			};
-
-			int innerResult = 0;
-			ProcessRequestStatus status = calculate(&inner, &innerResult);
-			if (status != STATUS_PROCESS)
-				return status;
-
-			// 결과를 numbers[i]에 덮어쓰기
-			data->numbers[i] = innerResult;
-
-			// 괄호 구간 삭제 후 시프트
-			int removeOps = (j - i);
-			for (int k = i + 1; k < data->numberLen - removeOps + 1; k++)
-			{
-				data->numbers[k] = data->numbers[k + removeOps - 1];
-			}
-			for (int k = i; k < data->operatorLen - removeOps + 1; k++)
-			{
-				data->operators[k] = data->operators[k + removeOps];
-			}
-
-			data->numberLen -= (removeOps - 1);
-			data->operatorLen -= removeOps;
-			continue; // 현재 위치 다시 검사 (중첩 괄호 가능)
+			values[++vTop] = val;
 		}
-		i++;
-
-	}
-
-	//곱셈 나눗셈
-	i = 0;
-	while (i < data->operatorLen) {
-		if (data->operators[i] == '*' || data->operators[i] == '/') {
-			int a = data->numbers[i];
-			int b = data->numbers[i + 1];
-
-			if (data->operators[i] == '/' && b == 0) {
-				executeProgramControl(STATUS_RESTART, "0으로 나눌 수 없습니다\n\n");
-				return STATUS_RESTART;
+		else if (s[i] == '(') {
+			ops[++oTop] = s[i];
+			i++;
+		}
+		else if (s[i] == ')') {
+			while (oTop >= 0 && ops[oTop] != '(') {
+				int b = values[vTop--];
+				int a = values[vTop--];
+				char op = ops[oTop--];
+				values[++vTop] = applyOp(a, b, op);
 			}
-
-			data->numbers[i] = (data->operators[i] == '*') ? a * b : a / b;
-
-			for (int j = i + 1; j < data->numberLen - 1; j++) {
-				data->numbers[j] = data->numbers[j + 1];
+			oTop--; // '(' 제거
+			i++;
+		}
+		else if (strchr("+-*/", s[i])) {
+			while (oTop >= 0 && precedence(ops[oTop]) >= precedence(s[i])) {
+				int b = values[vTop--];
+				int a = values[vTop--];
+				char op = ops[oTop--];
+				values[++vTop] = applyOp(a, b, op);
 			}
-			for (int j = i; j < data->operatorLen - 1; j++) {
-				data->operators[j] = data->operators[j + 1];
-			}
-			data->numberLen--;
-			data->operatorLen--;
+			ops[++oTop] = s[i];
+			i++;
 		}
 		else {
-			i++; // 곱셈, 나눗셈이 아닌 경우 다음 연산자 조회
+			i++; // 무시
 		}
 	}
 
-	// 덧셈, 뺄셈 계산
-	int temp = data->numbers[0];
-	for (i = 0; i < data->operatorLen; i++) {
-		if (data->operators[i] == '+') {
-			temp += data->numbers[i + 1];
-		}
-		else {
-			temp -= data->numbers[i + 1];
-		}
+	while (oTop >= 0) {
+		int b = values[vTop--];
+		int a = values[vTop--];
+		char op = ops[oTop--];
+		values[++vTop] = applyOp(a, b, op);
 	}
 
-	*result = temp;
+	*result = values[vTop];
 	return STATUS_PROCESS;
 }
