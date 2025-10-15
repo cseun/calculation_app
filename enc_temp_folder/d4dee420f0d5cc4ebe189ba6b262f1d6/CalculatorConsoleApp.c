@@ -356,4 +356,5 @@ ProcessRequestStatus calculate(ExpressionData* data, int* result)
 
 	*result = temp;
 	return STATUS_PROCESS;
+
 }
