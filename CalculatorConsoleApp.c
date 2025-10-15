@@ -2,6 +2,66 @@
 #include <Windows.h>
 #define _CRT_SECURE_NO_WARNINGS
 
+// 프로그램 처리 요청 상태
+typedef enum {
+	STATUS_PROCESS,		 // 다음 로직 실행 (정상 실행)
+	STATUS_FORCE_EXIT,	 // 강제 종료 (오류)
+	STATUS_EXIT,		 // 정상 종료
+	STATUS_RESTART       // 프로그램 재시작
+} ProcessRequestStatus;
+
+const char* validOperators = "*/+-"; // TODO ( 와 ) 추가 하기
+const char* exits = "xX";
+
+// executeProgramControl
+// 함수 정의: 프로그램 처리 요청 상태(ProcessRequestStatus)를 받아 각 상태에 따라 프로그램 종료 혹은 재 실행.
+//	- 프로그램 재실행은 함수 내에서 처리가 안되므로 재시작 값 반환
+//	- 프로그램 처리 요청 상태(종료/재시작)와, 출력문을 받고 처리한다.
+//		- 공통: 동적 메모리 해제를 통한 메모리 누수 차단	
+//		- 프로그램 재시작: 
+//			1) 재시작 문구 출력
+//			2) 프로그램 재시작 상태 값 ProcessRequestStatus::STATUS_RESTART 반환
+//		- 프로그램 비정상 종료
+//			1) 종료 문구 출력
+//			2) 종료 딜레이 (sleep(2000))
+//			3) 종료 exit(1);
+//		- 프로그램 정상 종료
+//			1) 종료 문구 출력
+//			2) 종료 딜레이 (sleep(2000))
+//			3) 종료 exit(0);
+ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, char* context);
+
+// validateExpression
+// 함수 정의: 사용자 입력 값을 필터링하며, 오류가 발생하는 경우 처리 요청 상태를 반환한다.
+// - 잘못된 입력값 필터링
+//	1) 앞 연산자 제거
+//		- 연산자가 열림 괄호일 경우 미제거
+//	2) 뒤 연산자 제거
+//		- 연산자가 닫힘 괄호일 경우 미제거
+//	3) 저장된 값이 있는지 체크
+//		- 저장된 값이 없을 경우 재시작 요청 상태를 반환한다.
+//	4) 연산자 연속 입력 오류 체크
+//		- 잘못된 입력이였을 경우 재시작 요청 상태를 반환한다.
+//  5) TODO 괄호가 쌍을 이루는지 오류 체크
+//		- 열림 닫침 (, ) 괄호가 쌍으로 있어야한다.
+//		- 잘못된 입력이였을 경우 재시작 요청 상태를 반환한다.
+// - 정상적으로 처리되었을 경우 다음 로직 실행 상태를 반환한다.
+ProcessRequestStatus validateExpression(int* exprLen, char* expression);
+
+// parseExpression
+// 함수 정의: 연산식을 받아서 연산자와 피연산자를 연산 순서대로 각각 나눠담는 함수
+//	- TODO 괄호도
+ProcessRequestStatus parseExpression(int numbers[], char operators[], int* numberIdx, int* operatorIdx);
+
+// 함수 정의: 연산자와 피연산자 배열을 순회하여 계산하고 결과값을 구하는 함수
+//	- 결과값을 리턴한다.
+//	1) 괄호를 안에 있는 값을 가장 먼저 계산 진행
+//		- 괄호를 만나면 재귀 호출로 안쪽부터 계산
+//	2) 곱셈 나눗셈 계산 먼저 진행
+//		- 나눗셈 오류 체크 (나눗셈 연산 중 0으로 나누는 경우 오류발생)
+//		- 잘못된 입력이였을 경우 재시작 요청 상태를 반환한다.
+//	3) 덧셈 뺄셈 계산 진헹 
+int calculate(char* expression);
 
 int main()
 {
@@ -113,10 +173,12 @@ int main()
 		while (*expressionPtr) { // 표현식이 존재할때 까지
 			char* endptr;
 			int num = strtol(expressionPtr, &endptr, 10);
+			
 			// 포인터가 가리키는 값이 숫자인 경우
 			if (isdigit((unsigned char)*expressionPtr)) {
 				numbers[numberIdx] = num;
 				expressionPtr = endptr;
+		
 				// 숫자 다음 포인터 값이 연산자인 경우
 				if (*expressionPtr && strchr(validOperators, *expressionPtr)) {
 					operators[operatorIdx] = *expressionPtr;
@@ -124,7 +186,8 @@ int main()
 					operatorIdx++;
 				}
 				numberIdx++;
-			}
+			} 
+			//else if ( TODO 괄호 추가 )
 			else {
 				break;
 			}
@@ -194,4 +257,21 @@ int main()
 	}
 
 	return 1;
+}
+
+ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, char* context)
+{
+
+}
+ProcessRequestStatus validateExpression(int* exprLen, char* expression)
+{
+
+}
+ProcessRequestStatus parseExpression(int numbers[], char operators[], int* numberIdx, int* operatorIdx)
+{
+
+}
+int calculate(char* expression) 
+{
+
 }
