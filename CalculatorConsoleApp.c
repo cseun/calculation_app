@@ -1,346 +1,441 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <crtdbg.h>
 #include <Windows.h>
-#define _CRT_SECURE_NO_WARNINGS
-//123 + 2 * 2 + (3 + 2) -> 129 || (3+2) -> 3
-// enum, struct, static 변수
-typedef enum {
-	STATUS_PROCESS,		 // 다음 로직 실행 (정상 실행)
-	STATUS_FORCE_EXIT,	 // 강제 종료 (오류)
-	STATUS_EXIT,		 // 정상 종료
-	STATUS_RESTART       // 프로그램 재시작
-} ProcessRequestStatus;
-typedef struct {
-	const char* expression; // 원본 수식
-	int* numbers;           // 피연산자 배열
-	int  numberLen;         // 피연산자 개수
-	char* operators;        // 연산자 배열
-	int  operatorLen;       // 연산자 개수
-} ExpressionData;
-void* dynamicArrays[3] = { NULL, 
-NULL, NULL };	// 동적 배열 메모리 한번에 관리
-const char* validOperators = "*/+-()";
-const char* validBasicOperators = "*/+-";
-const char* exits = "xX";
 
 // 함수 선언
-ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, char* context);
-ProcessRequestStatus validateExpression(int *exprLen, char* expression);
-ProcessRequestStatus parseExpression(ExpressionData* data);
-ProcessRequestStatus calculate(ExpressionData* data, int* result);
+bool insertExpression(const char* validOperators, const char* exits, char** expressionPtr, int* exprSizePtr);	// 계산식 입력
+bool validateExpression(const char* expression);	// 계산식 필터링
+bool normalizeExpression(char* expression, int* exprSizePtr); // 연산식 보정
+bool getCalculateResult(char* expression, double* result); // 계산
+double calculate(const char* expression);
+int precedence(char op);
+double applyOp(double a, double b, char op);
 
 int main()
 {
-	ProcessRequestStatus status;
+	const char* validOperators = "*/+-().";
+	const char* exits = "xX";
+	int exprSize = 100;
+	char* expression = (char*)malloc(sizeof(char) * exprSize);
+	if (!expression) {
+		printf("계산식 배열(expression) 메모리 할당 오류 발생.\n\n");
+		exit(0);
+	}
 
 	printf("== 계산기 프로그램 ==\n");
 
 	while (1)
 	{
+		printf("(●ˇ∀ˇ●) 프로그램 시작 \n");
 		printf("[ 설명 ]\n");
-		printf("계산할 연산식을 입력하시오(종료문자 x 혹은 mX) ex) 1+2*3\n");
-		printf("- 가능한 연산문자 +, -, *, /\n");
+		printf("계산할 연산식을 입력하시오. (종료문자 x 혹은 X)\n");
+		printf("- 가능한 연산문자 +, -, *, /, 괄호(, )\n");
+		printf("- 소수점 자리는 2자리까지 표시됩니다.\n");
 		printf("- 허용된 연산문자 외의 문자는 제외하고 계산됩니다. \n");
 		printf("- 첫 글자가 종료문자(X, X)인 경우 프로그램이 종료됩니다. \n:");
-		
-		int exprLen = 0, exprSize = 100;
-		char* expression = (char*)malloc(sizeof(char) * exprSize);
-		if (!expression) {
-			executeProgramControl(STATUS_FORCE_EXIT,"메모리 할당 실패. 관리자 문의 필요\n");
-		}
 
-		dynamicArrays[0] = expression;
+		//expression 내부값 초기화
 
-		// == 사용자 입력 ==
-		bool isFirst = TRUE;
-		int ch;
-		while ((ch = getchar()) != '\n' && ch != EOF) {
-			if (isFirst) {
-				if (strchr(exits, ch)) {
-					executeProgramControl(STATUS_EXIT, "사용자 종료 요청");
-				}
-				isFirst = FALSE;
-			}
+		if (!insertExpression(validOperators, exits, &expression, &exprSize)) continue;
 
-			if (isdigit(ch) || strchr(validOperators, ch)) {
-				if (exprLen + 1 >= exprSize) {
-					exprSize *= 2;
-					char* temp = (char*)realloc(expression, sizeof(char) * exprSize);
-					if (!temp) {
-						executeProgramControl(STATUS_FORCE_EXIT, "메모리 재할당 실패. 관리자 문의 필요\n");
-					}
-					expression = temp;
-					dynamicArrays[0] = expression; // realloc 후 다시 대입
-				}
-				expression[exprLen++] = (char)ch;
-			}
-		}
-		expression[exprLen] = '\0';
+		printf("[ 실행 과정 ]\n");
+		printf("입력된 계산식(앞/뒤 오타 제외): %s\n", expression);
 
-		if (ch == EOF && ferror(stdin)) {
-			clearerr(stdin);
-			executeProgramControl(STATUS_RESTART, "입력 값 읽어오는 중 오류 발생.재입력 해주세요.\n");
-			continue;
-		}
-		if (exprLen == 0) {
-			executeProgramControl(STATUS_RESTART, "저장된 계산식이 없습니다. 다시 입력해주세요.\n\n");
-			continue;
-		}
-
-		// == 수식 필터링 ==
-		exprLen = strlen(expression);
-		status = validateExpression(&exprLen, expression);
-		if (status == STATUS_RESTART) {
-			continue;
-		}
-
-		// == 연산자, 피연산자 배열 분리 ==
-		int* numbers = (int*)malloc(sizeof(int) * exprLen);
-		char* operators = (char*)malloc(sizeof(char) * exprLen);
-		if (!numbers || !operators) {
-			executeProgramControl(STATUS_RESTART, "메모리 할당 실패\n\n");
-			continue;
-		}
-		dynamicArrays[1] = numbers;
-		dynamicArrays[2] = operators;
-
-		ExpressionData data = {
-			expression,
-			numbers,   
-			0,  // numberLen
-			operators,
-			0  // operatorLen
-		};
-		status = parseExpression(&data);
-
-		if (status == STATUS_RESTART) {
-			continue;
-		}
-
-		// === 계산식 출력 및 계산 ===
-		printf("\n[계산 결과]\n");
+		if (!validateExpression(expression)) continue;
 		printf("- 필터링된 계산식: %s\n", expression);
-		printf("-- 연산자:");
-        for (int i = 0; i < data.operatorLen; i++) printf("%c ", operators[i]);
-        printf("\n-- 피연산자:");
-        for (int i = 0; i < data.numberLen; i++) printf("%d ", numbers[i]);
 
-		int result = 0;
-		status = calculate(&data, &result);
-		if (status == STATUS_RESTART) {
-			continue;
-		}
+		if (!normalizeExpression(expression, &exprSize)) continue;
+		printf("- 보정된 계산식: %s\n", expression);
 
-		printf("\n==> 계산 결과: %d\n\n", result);
-		executeProgramControl(STATUS_RESTART, "");
+		double result = 0.0;
+		if (!getCalculateResult(expression, &result)) continue;
+		printf("계산 결과: %.2f\n\n", result);
+
+		fflush(stdout);
 	}
 
 	return 1;
 }
 
-ProcessRequestStatus executeProgramControl(ProcessRequestStatus status, char* context)
+// 계산식 입력 (불필요한 앞/뒤 문자 제거 포함)
+bool insertExpression(const char* validOperators, const char* exits, char** expressionPtr, int* exprSizePtr)
 {
-	if (context)
-		printf("%s\n", context);
+	char* expression = *expressionPtr;
+	int exprSize = *exprSizePtr;
+	int exprIdx = 0;
+	int ch;
+	bool isFirst = true;
+	int lastDigit = -1;
+	int lastOp = -1;
 
-	// 동적 메모리 해제 (TODO 이후 가변적으로 처리)
-	for (int i = 0; i < 3; i++) {
-		if (dynamicArrays[i]) {
-			free(dynamicArrays[i]);
-			dynamicArrays[i] = NULL;
-		}
-	}
-
-	switch (status)
-	{
-		case STATUS_FORCE_EXIT:
-			// 강제 종료 (오류)
-			printf("프로그램이 2초 후 강제 종료됩니다.");
-			Sleep(2000);
-			exit(1);
-			break;
-		
-		case STATUS_EXIT:
-			// 정상 종료
-			printf("프로그램이 2초 후 정상 종료됩니다.");
-			Sleep(2000);
-			exit(0);
-			break;
-
-		case STATUS_RESTART:
-			// 프로그램 재시작
-			printf("=== 프로그램 재시작 ===\n");
-			return STATUS_RESTART;
-
-		default: 
-			return STATUS_PROCESS;
-	}
-}
-
-ProcessRequestStatus validateExpression(int* exprLen, char* expression)
-{
-	// 앞 연산자 제거
-	while (*exprLen > 0 && strchr(validOperators, expression[0])) {
-		if (expression[0] == '(') break;
-		memmove(expression, expression + 1, strlen(expression));
-		(*exprLen)--;
-	}
-
-	// 뒤 연산자 제거
-	while (*exprLen > 0 && strchr(validOperators, expression[*exprLen - 1])) {
-		if (expression[*exprLen - 1] == ')') break;
-		expression[--(*exprLen)] = '\0';
-	}
-
-	// 저장된 값이 없음 오류
-	if (*exprLen == 0) {
-		return executeProgramControl(STATUS_RESTART, "계산식 정리 중 계산식이 비어 있습니다. 다시 입력해주세요.\n\n");
-	}
-
-	// 연산자 연속 오류 검사
-	for (int i = 1; i < *exprLen; ++i) {
-		if (strchr(validBasicOperators, expression[i - 1]) && strchr(validBasicOperators, expression[i])) {
-			return executeProgramControl(STATUS_RESTART, "계산식 정리 중 오타로 인한 연산자 연속. 재입력 요청\n\n");
-		}
-	}
-
-	// 괄호 검사
-	// 1. ( 뒤: 숫자, 또 다른 '(' , 단항 +/-
-	// 2. ) 뒤: 또 다른 ) 또는 '(' 또는 기본 연산자
-	// 3. 숫자 바로 뒤에 여는 괄호: 곱셈 생략 (예: 3(2+1)) _ 오류발생으로 보류 
-
-	int balance = 0;
-	for (int i = 0; i < *exprLen; ++i) {
-		if (expression[i] == '(')
-			balance++;
-		else if (expression[i] == ')')
-			balance--;
-
-			if (balance < 0) {
-			return executeProgramControl(STATUS_RESTART, "닫는 괄호 ')'가 너무 많습니다. 수식을 다시 입력해주세요.\n\n");
-		}
-	}
-
-	if (balance != 0) {
-		return executeProgramControl(STATUS_RESTART, "괄호 짝이 맞지 않습니다. 다시 입력해주세요.\n\n");
-	}
-
-	return STATUS_PROCESS;
-
-}
-
-ProcessRequestStatus parseExpression(ExpressionData* data)
-{
-	char* expressionPtr = data->expression;
-	while (*expressionPtr) { // 표현식이 존재할때 까지
-		char* endptr;
-		int num = strtol(expressionPtr, &endptr, 10);
-
-		// 포인터가 가리키는 값이 숫자인 경우
-		if (isdigit((unsigned char)*expressionPtr)) {
-			data->numbers[data->numberLen++] = num;
-			expressionPtr = endptr;
-
-			// 숫자 뒤에 연산자가 있으면 추가
-			if (*expressionPtr && strchr(validOperators, *expressionPtr)) {
-				data->operators[data->operatorLen++] = *expressionPtr;
-				expressionPtr++;
+	while ((ch = getchar()) != '\n' && ch != EOF) {
+		if (isFirst) {
+			if (strchr(exits, ch)) {
+				printf("프로그램이 2초 후 종료됩니다.");
+				Sleep(2000);
+				exit(0);
 			}
-		} 
-		else if (strchr(validOperators, *expressionPtr)) {
-			// 연산자 또는 괄호
-			data->operators[data->operatorLen++] = *expressionPtr;
-			expressionPtr++;
-		/*else if (*expressionPtr == '(' || *expressionPtr == ')') { 
-			data->operators[data->operatorLen++] = *expressionPtr;
-			expressionPtr++;*/
-		} else {
-			return executeProgramControl(STATUS_RESTART, "공백 또는 잘못된 문자 발견.\n\n");
+			isFirst = false;
+		}
+
+		// 첫 문자 불가 연산자 제거
+		if (exprIdx == 0 && strchr("+*/)", ch)) continue;
+
+		if (isdigit(ch) || strchr(validOperators, ch)) {
+			// 메모리 재할당
+			if (exprIdx + 1 >= exprSize) {
+				exprSize *= 2;
+				char* temp = (char*)realloc(expression, sizeof(char) * exprSize);
+				if (!temp) {
+					printf("계산식 배열(expression) 메모리 재할당 오류 발생.\n\n");
+					return false;
+				}
+				expression = temp;
+				*expressionPtr = expression;
+				*exprSizePtr = exprSize;
+			}
+
+			expression[exprIdx] = (char)ch;
+
+			// 마지막 숫자/연산자 위치 갱신
+			if (isdigit(ch)) lastDigit = exprIdx;
+			if (strchr(validOperators, ch)) lastOp = exprIdx;
+
+			exprIdx++;
 		}
 	}
+	expression[exprIdx] = '\0';
 
-	if (data->numberLen < 2 || data->operatorLen < 1) {
-		return executeProgramControl(STATUS_RESTART, "계산에 필요한 숫자 혹은 연산자가 부족. 재입력 해주세요\n\n");
+	// 마지막 숫자 이후 불필요한 연산자 제거
+	if (lastDigit != -1 && lastOp > lastDigit) {
+		for (int i = lastDigit + 1; i < exprIdx; i++) {
+			if (expression[i] != ')') {
+				memmove(&expression[i], &expression[i + 1], strlen(expression + i));
+				i--;
+				exprIdx--;
+			}
+		}
+		expression[exprIdx] = '\0';
 	}
+
+	if (ch == EOF && ferror(stdin)) {
+		clearerr(stdin);
+		printf("입력 중 오류 발생.\n\n");
+		return false;
+	}
+
+	if (exprIdx == 0) {
+		printf("입력된 계산식이 없음.\n\n");
+		return false;
+	}
+
+	return true;
+}
+
+// 계산식 유효성 검사
+bool validateExpression(const char* expression) {
+	int depth = 0;          // 괄호 깊이
+	bool hasDot = false;    // 현재 숫자 내 소수점 존재 여부
+	char prev = 0;          // 이전 문자 저장
+
+	for (int i = 0; expression[i] != '\0'; i++) {
+		char ch = expression[i];
+
+		// 괄호 짝 검사
+		if (ch == '(') depth++;
+		else if (ch == ')') depth--;
+
+		if (depth < 0) return false; // 닫힘 괄호 초과
+
+		// 연속 연산자 검사 (예외: +-, --, *-, /-)
+		if (prev != '\0' && ch != '\0' && strchr("+-*/", prev) && strchr("+-*/", ch)) {
+			if (!(ch == '-' && strchr("+-*/", prev))) {
+				printf("연산자 연속 오류 \n\n");
+				return false;
+			}
+		}
+
+		// 소수점 검사
+		if (ch == '.') {
+			if (hasDot || !isdigit(prev)) return false;
+			hasDot = true;
+		}
+		else if (!isdigit(ch)) {
+			hasDot = false; // 소수점 포함 상태 리셋
+		}
+
+		prev = ch;
+	}
+
+	if (depth != 0) {
+		printf("괄호 짝 불일치.\n\n");
+		return false;
+	}
+
+	return true;
+}
+
+// 연산식 보정 (괄호, 곱셈 누락/생략 등)
+bool normalizeExpression(char* expression, int* exprSizePtr) {
+	int exprSize = *exprSizePtr;
+	int exprLen = strlen(expression);
 	
-	data->operators[data->operatorLen] = '\0';
-	return STATUS_PROCESS;
+	char* temp = (char*)malloc(sizeof(char) * (exprSize * 2));
+	if (!temp) {
+		printf("계산식을 임시 저장할 배열(temp) 메모리 할당 오류.\n\n");
+		return false;
+	}
+
+	int j = 0;
+	// 괄호 및 숫자 간 곱셈 보정
+	for (int i = 0; i < exprLen; i++) {
+		char ch = expression[i];
+		char next = (i + 1 < exprLen) ? expression[i + 1] : '\0';
+
+		// 0) 빈 괄호 제거
+		if (ch == '(' && next == ')') {
+			i++; // 빈괄호 건너뛰기
+			continue;
+		}
+
+		// 1) 숫자 바로 뒤 '(' → * 추가
+		if (isdigit((unsigned char)ch) && next == '(') {
+			temp[j++] = ch;
+			temp[j++] = '*';
+		}
+
+		// 2) ')' 바로 뒤 숫자 → * 추가
+		else if (ch == ')' && isdigit((unsigned char)next)) {
+			temp[j++] = ch;
+			temp[j++] = '*';
+		}
+
+		// 3) ')' 바로 뒤 '(' → * 추가
+		else if (ch == ')' && next == '(') {
+			temp[j++] = ch;
+			temp[j++] = '*';
+		}
+
+		// 4) '-(' 단항 음수 괄호 처리 → -1*(...)
+		else if (ch == '-' && next == '(') {
+			temp[j++] = '-';
+			temp[j++] = '1';
+			temp[j++] = '*';
+		}
+		else {
+			temp[j++] = ch;
+		}
+
+		// 메모리 재할당
+		if (j + 1 > exprSize) {
+			exprSize *= 2;
+			char* temptemp = (char*)realloc(temp, sizeof(char) * exprSize);
+			if (!temptemp) {
+				printf("계산식 배열(expression) 메모리 재할당 오류 발생.\n\n");
+				free(temp);
+				return false;
+			}
+			temp = temptemp;
+		}
+	}
+	temp[j] = '\0';
+	int maxCopySize = *exprSizePtr - 1;
+	strncpy(expression, temp, maxCopySize);
+	expression[maxCopySize] = '\0';
+
+	exprLen = strlen(expression);
+	j = 0;
+
+	// 단항 괄호 제거
+	for (int i = 0; i < exprLen; i++) {
+		char ch = expression[i];
+		if (ch == '(') {
+			int innerStart = i + 1;
+			int innerEnd = innerStart;
+
+			// 부호 포함 단항
+			if (expression[innerStart] == '-' || expression[innerStart] == '+') innerEnd++;
+			// 숫자 및 소수점
+			while (isdigit(expression[innerEnd]) || expression[innerEnd] == '.') innerEnd++;
+			// 단항 괄호이면 내부 내용만 복사
+			if (expression[innerEnd] == ')' && innerEnd > innerStart) {
+				for (int k = innerStart; k < innerEnd; k++)
+				{
+					temp[j++] = expression[k];
+				}
+				i = innerEnd;
+				continue;
+			}
+		}
+		temp[j++] = ch;
+	}
+	temp[j] = '\0';
+
+	strncpy(expression, temp, maxCopySize);
+	expression[maxCopySize] = '\0';
+
+	*exprSizePtr = (int)strlen(expression) + 1;
+	free(temp);
+
+	return true;
+}
+
+// 계산
+bool getCalculateResult(char* expression, double* finalResult)
+{
+	char* startPtr = NULL;
+	char* endPtr = NULL;
+	int exprLen = strlen(expression);
+	double result = 0.0;
+
+	char* innerExpression = (char*)malloc(sizeof(char) * (exprLen + 1));
+	if (!innerExpression) {
+		printf("괄호 내부 계산식 임시저장 배열(innerExpression) 메모리 재할당 오류 발생.\n\n");
+		return false;
+	}
+	char* tempExpression = (char*)malloc(sizeof(char) * (exprLen * 2 + 1));
+	if (!tempExpression) {
+		printf("계산식 임시저장 배열(tempExpression) 메모리 재할당 오류 발생.\n\n");
+		return false;
+	}
+
+	strcpy(tempExpression, expression);
+	while ((startPtr = strrchr(expression, '(')) != NULL)
+	{
+		// 닫힘 괄호가 나오기 전까지를 배열에 담아 계산 함수에 보낸다. 
+		endPtr = strchr(startPtr, ')');
+		if (!endPtr) {
+			printf("닫힘 괄호가 없음.\n\n");
+			return false;
+		}
+
+		// 내부 계산식 추출
+		int innerLen = endPtr - startPtr - 1;
+		strncpy(innerExpression, startPtr + 1, innerLen);
+		innerExpression[innerLen] = '\0';
+
+		result = calculate(innerExpression);
+		
+
+		// 임시 계산식 배열에 열림 괄호 전, 계산 결과, 닫힘괄호 후 문자들을 합쳐 저장한다. 
+		sprintf(tempExpression, "%.*s%.2f%s",
+			(int)(startPtr - expression),
+			expression,
+			result,
+			endPtr + 1
+		);
+		strcpy(expression, tempExpression);
+		printf("%s", tempExpression);
+	}
+
+	// 괄호가 없다면 전체를 배열에 담아 계산 함수에 보낸다.
+	result = calculate(tempExpression);
+
+	*finalResult = result;
+	free(innerExpression);
+	free(tempExpression);
+	
+	return true;
+}
+
+double calculate(const char* expression)
+{
+	int exprLen = strlen(expression);
+	double* numbers = (double*)malloc(sizeof(double) * (exprLen + 1));
+	char* operators = (char*)malloc(sizeof(char) * (exprLen + 1));
+	if (!numbers || !operators) {
+		return false;
+	}
+
+	int numTop = -1;
+	int opTop = -1;
+	int i = 0;
+	bool isNegative = false;
+	
+	while (expression[i] != '\0') {
+		char ch = expression[i];
+
+		// 음수 부호 처리 (처음이거나 이전이 연산자일 때)
+		if (ch == '-' && (i == 0 || strchr("+-*/", expression[i - 1]))) {
+			isNegative = true;
+			i++;
+			continue;
+		}
+
+		// 숫자 처리
+		if (isdigit((unsigned char)ch)) {
+			bool isFraction = false;
+			double val = 0;
+			double divisor = 1.0;
+			while (isdigit((unsigned char)expression[i]) || expression[i] == '.')
+			{
+				if (expression[i] == '.') {
+					isFraction = true;
+					i++;
+					continue;
+				}
+				
+				val = val * 10 + (expression[i] - '0');
+				if (isFraction) divisor *= 10.0;
+				
+				i++;
+			}
+
+			val /= divisor;
+
+			if (isNegative) {
+				val = -val;
+				isNegative = false;
+			}
+
+			numbers[++numTop] = val;
+			continue;
+		}
+
+		// 연산자 처리
+		if (strchr("+-*/", ch)) {
+			while (opTop >= 0 && precedence(operators[opTop]) >= precedence(ch)) {
+				double b = numbers[numTop--];
+				double a = numbers[numTop--];
+				char op = operators[opTop--];
+				numbers[++numTop] = applyOp(a, b, op);
+			}
+			operators[++opTop] = ch;
+		}
+
+		i++;
+	}
+
+	// 남은 연산 처리
+	while (opTop >= 0) {
+		double b = numbers[numTop--];
+		double a = numbers[numTop--];
+		char op = operators[opTop--];
+		numbers[++numTop] = applyOp(a, b, op);
+	}
+
+	double result = numbers[numTop];
+	free(numbers);
+	free(operators);
+
+	return result;
+}
+
+double applyOp(double a, double b, char op) {
+	switch (op) {
+	case '+': return a + b;
+	case '-': return a - b;
+	case '*': return a * b;
+	case '/': return b != 0 ? a / b : 0;
+	default: return 0;
+	}
 }
 
 int precedence(char op) {
     if (op == '+' || op == '-') return 1;
     if (op == '*' || op == '/') return 2;
     return 0;
-}
-
-int applyOp(int a, int b, char op) {
-    switch (op) {
-    case '+': return a + b;
-    case '-': return a - b;
-    case '*': return a * b;
-    case '/': 
-        if (b == 0) {
-            printf("0으로 나눌 수 없습니다.\n");
-            return 0;
-        }
-        return a / b;
-    }
-    return 0;
-}
-
-ProcessRequestStatus calculate(ExpressionData* data, int* result)
-{
-	const char* s = data->expression;
-	int values[256]; int vTop = -1;
-	char ops[256]; int oTop = -1;
-
-	for (int i = 0; s[i]; ) {
-		if (isspace((unsigned char)s[i])) { i++; continue; }
-
-		if (isdigit((unsigned char)s[i])) {
-			int val = 0;
-			while (isdigit((unsigned char)s[i])) {
-				val = val * 10 + (s[i] - '0');
-				i++;
-			}
-			values[++vTop] = val;
-		}
-		else if (s[i] == '(') {
-			ops[++oTop] = s[i];
-			i++;
-		}
-		else if (s[i] == ')') {
-			while (oTop >= 0 && ops[oTop] != '(') {
-				int b = values[vTop--];
-				int a = values[vTop--];
-				char op = ops[oTop--];
-				values[++vTop] = applyOp(a, b, op);
-			}
-			oTop--; // '(' 제거
-			i++;
-		}
-		else if (strchr("+-*/", s[i])) {
-			while (oTop >= 0 && precedence(ops[oTop]) >= precedence(s[i])) {
-				int b = values[vTop--];
-				int a = values[vTop--];
-				char op = ops[oTop--];
-				values[++vTop] = applyOp(a, b, op);
-			}
-			ops[++oTop] = s[i];
-			i++;
-		}
-		else {
-			i++; // 무시
-		}
-	}
-
-	while (oTop >= 0) {
-		int b = values[vTop--];
-		int a = values[vTop--];
-		char op = ops[oTop--];
-		values[++vTop] = applyOp(a, b, op);
-	}
-
-	*result = values[vTop];
-	return STATUS_PROCESS;
 }
