@@ -30,7 +30,7 @@ int main()
 		printf("- 가능한 연산문자 +, -, *, /, 괄호(, )\n");
 		printf("- 허용된 연산문자 외의 문자는 제외하고 계산됩니다. \n");
 		printf("- 첫 글자가 종료문자(X, X)인 경우 프로그램이 종료됩니다. \n:");
-
+		
 		int dynamicMemoryIdx = 0, exprSize = 100;
 		char* expression = (char*)malloc(sizeof(char) * exprSize);
 		if (!expression) {
@@ -38,7 +38,7 @@ int main()
 			continue;
 		}
 		dynamicMemorys[dynamicMemoryIdx] = expression;
-
+		
 		if (!insertExpression(validOperators, exits, &dynamicMemorys[dynamicMemoryIdx], expression, exprSize)) {
 			if (strchr(exits, expression[0])) {
 				printf("프로그램이 2초 후 종료됩니다.");
@@ -103,18 +103,18 @@ bool insertExpression(const char* validOperators, const char* exits, void** dyna
 				expression = temp; // realloc 후 다시 대입
 				*dynamicMemory = temp;
 			}
-
+			
 			expression[exprIdx] = (char)ch;
 
 			// 마지막 숫자/연산자 위치 갱신
 			if (isdigit(ch)) lastDigit = exprIdx;
 			if (strchr(validOperators, ch)) lastOp = exprIdx;
-
+		
 			exprIdx++;
 		}
 	}
 	expression[exprIdx] = '\0';
-
+	 
 	// 마지막 숫자 이후 불필요한 연산자 제거
 	if (lastDigit != -1 && lastOp > lastDigit) {
 		for (int i = lastDigit + 1; i < exprIdx; i++) {
@@ -126,7 +126,7 @@ bool insertExpression(const char* validOperators, const char* exits, void** dyna
 		}
 		expression[exprIdx] = '\0';
 	}
-
+	
 	if (ch == EOF && ferror(stdin)) {
 		clearerr(stdin);
 		printf("입력 중 오류 발생.\n\n");
@@ -153,7 +153,7 @@ bool validateExpression(const char* expression) {
 		// 괄호 짝 검사
 		if (ch == '(') depth++;
 		else if (ch == ')') depth--;
-
+		
 		if (depth < 0) return false; // 닫힘 괄호 초과
 
 		// 연속 연산자 검사 (예외: +-, --, *-, /-)
@@ -269,7 +269,7 @@ bool normalizeExpression(char* expression, void** dynamicMemory, int exprLen) {
 
 			// 단항 괄호이면 내부 내용만 복사
 			if (expression[innerEnd] == ')' && innerEnd > innerStart) {
-				for (int k = innerStart; k < innerEnd; k++)
+				for (int k = innerStart; k < innerEnd; k++) 
 				{
 					temp[j++] = expression[k];
 				}
@@ -303,90 +303,12 @@ bool calculate(char* expression, void** dynamicMemorys, int dynamicMemoryIdx)
 
 	return true;
 }
-//void resetProgram(void** dynamicMemorys, int dynamicMemoryCnt)
-//{
-//	for (int i = 0; i < dynamicMemoryCnt; i++) {
-//		if (dynamicMemorys[i]) {
-//			free(dynamicMemorys[i]);
-//			dynamicMemorys[i] = NULL;
-//		}
-//	}
-//}
-//
-//int precedence(char op) {
-//    if (op == '+' || op == '-') return 1;
-//    if (op == '*' || op == '/') return 2;
-//    return 0;
-//}
-//
-//int applyOp(int a, int b, char op) {
-//    switch (op) {
-//    case '+': return a + b;
-//    case '-': return a - b;
-//    case '*': return a * b;
-//    case '/': 
-//        if (b == 0) {
-//            printf("0으로 나눌 수 없습니다.\n");
-//            return 0;
-//        }
-//        return a / b;
-//    }
-//    return 0;
-//}
-//
-//bool calculate(ExpressionData* data, int* result)
-//{
-//	const char* s = data->expression;
-//	int values[256]; int vTop = -1;
-//	char ops[256]; int oTop = -1;
-//
-//	for (int i = 0; s[i]; ) {
-//		if (isspace((unsigned char)s[i])) { i++; continue; }
-//
-//		if (isdigit((unsigned char)s[i])) {
-//			int val = 0;
-//			while (isdigit((unsigned char)s[i])) {
-//				val = val * 10 + (s[i] - '0');
-//				i++;
-//			}
-//			values[++vTop] = val;
-//		}
-//		else if (s[i] == '(') {
-//			ops[++oTop] = s[i];
-//			i++;
-//		}
-//		else if (s[i] == ')') {
-//			while (oTop >= 0 && ops[oTop] != '(') {
-//				int b = values[vTop--];
-//				int a = values[vTop--];
-//				char op = ops[oTop--];
-//				values[++vTop] = applyOp(a, b, op);
-//			}
-//			oTop--; // '(' 제거
-//			i++;
-//		}
-//		else if (strchr("+-*/", s[i])) {
-//			while (oTop >= 0 && precedence(ops[oTop]) >= precedence(s[i])) {
-//				int b = values[vTop--];
-//				int a = values[vTop--];
-//				char op = ops[oTop--];
-//				values[++vTop] = applyOp(a, b, op);
-//			}
-//			ops[++oTop] = s[i];
-//			i++;
-//		}
-//		else {
-//			i++; // 무시
-//		}
-//	}
-//
-//	while (oTop >= 0) {
-//		int b = values[vTop--];
-//		int a = values[vTop--];
-//		char op = ops[oTop--];
-//		values[++vTop] = applyOp(a, b, op);
-//	}
-//
-//	*result = values[vTop];
-//	return STATUS_PROCESS;
-//}
+void resetProgram(void** dynamicMemorys, int dynamicMemoryCnt)
+{
+	for (int i = 0; i < dynamicMemoryCnt; i++) {
+		if (dynamicMemorys[i]) {
+			free(dynamicMemorys[i]);
+			dynamicMemorys[i] = NULL;
+		}
+	}
+}
