@@ -2,31 +2,33 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <crtdbg.h>
 #include <Windows.h>
 
 // 함수 선언
-bool insertExpression(const char* validOperators, const char* exits, void** dynamicMemory, char* expression, int exprSize);	// 계산식 입력
+bool insertExpression(const char* validOperators, const char* exits, char** expressionPtr, int* exprSizePtr);	// 계산식 입력
 bool validateExpression(const char* expression);	// 계산식 필터링
-bool normalizeExpression(char* expression, void** dynamicMemory, int exprLen); // 연산식 보정
+bool normalizeExpression(char* expression, int* exprSizePtr); // 연산식 보정
 bool getCalculateResult(char* expression, double* result); // 계산
-void resetProgram(void** dynamicMemorys, int dynamicMemoryCnt);
-double calculate(const char* expression, int exprLen);
+double calculate(const char* expression);
 int precedence(char op);
 double applyOp(double a, double b, char op);
 
 int main()
 {
-	void* dynamicMemorys[4] = { NULL, NULL, NULL, NULL };	// 동적 배열 메모리 한번에 관리
-	int dynamicMemoryCnt = sizeof(dynamicMemorys) / sizeof(void*);
 	const char* validOperators = "*/+-().";
 	const char* exits = "xX";
+	int exprSize = 100;
+	char* expression = (char*)malloc(sizeof(char) * exprSize);
+	if (!expression) {
+		printf("계산식 배열(expression) 메모리 할당 오류 발생.\n\n");
+		exit(0);
+	}
 
 	printf("== 계산기 프로그램 ==\n");
 
 	while (1)
 	{
-		resetProgram(dynamicMemorys, dynamicMemoryCnt);
-
 		printf("(●ˇ∀ˇ●) 프로그램 시작 \n");
 		printf("[ 설명 ]\n");
 		printf("계산할 연산식을 입력하시오. (종료문자 x 혹은 X)\n");
@@ -35,24 +37,9 @@ int main()
 		printf("- 허용된 연산문자 외의 문자는 제외하고 계산됩니다. \n");
 		printf("- 첫 글자가 종료문자(X, X)인 경우 프로그램이 종료됩니다. \n:");
 
-		int dynamicMemoryIdx = 0, exprSize = 100;
-		char* expression = (char*)malloc(sizeof(char) * exprSize);
-		if (!expression) {
-			printf("계산식 배열(expression) 메모리 할당 오류 발생.\n\n");
-			continue;
-		}
-		dynamicMemorys[dynamicMemoryIdx] = expression;
+		//expression 내부값 초기화
 
-		if (!insertExpression(validOperators, exits, &dynamicMemorys[dynamicMemoryIdx], expression, exprSize)) {
-			if (strchr(exits, expression[0])) {
-				printf("프로그램이 2초 후 종료됩니다.");
-				resetProgram(dynamicMemorys, dynamicMemoryCnt);
-				Sleep(2000);
-				exit(0);
-			}
-			continue;
-		}
-		dynamicMemoryIdx++;
+		if (!insertExpression(validOperators, exits, &expression, &exprSize)) continue;
 
 		printf("[ 실행 과정 ]\n");
 		printf("입력된 계산식(앞/뒤 오타 제외): %s\n", expression);
@@ -60,9 +47,8 @@ int main()
 		if (!validateExpression(expression)) continue;
 		printf("- 필터링된 계산식: %s\n", expression);
 
-		if (!normalizeExpression(expression, &dynamicMemorys[dynamicMemoryIdx], (int)strlen(expression))) continue;
+		if (!normalizeExpression(expression, &exprSize)) continue;
 		printf("- 보정된 계산식: %s\n", expression);
-		dynamicMemoryIdx++;
 
 		double result = 0.0;
 		if (!getCalculateResult(expression, &result)) continue;
@@ -71,12 +57,14 @@ int main()
 		fflush(stdout);
 	}
 
-	return 0;
+	return 1;
 }
 
 // 계산식 입력 (불필요한 앞/뒤 문자 제거 포함)
-bool insertExpression(const char* validOperators, const char* exits, void** dynamicMemory, char* expression, int exprSize)
+bool insertExpression(const char* validOperators, const char* exits, char** expressionPtr, int* exprSizePtr)
 {
+	char* expression = *expressionPtr;
+	int exprSize = *exprSizePtr;
 	int exprIdx = 0;
 	int ch;
 	bool isFirst = true;
@@ -86,9 +74,9 @@ bool insertExpression(const char* validOperators, const char* exits, void** dyna
 	while ((ch = getchar()) != '\n' && ch != EOF) {
 		if (isFirst) {
 			if (strchr(exits, ch)) {
-				expression[exprIdx] = ch;
-				expression[exprIdx + 1] = '\0';
-				return false;
+				printf("프로그램이 2초 후 종료됩니다.");
+				Sleep(2000);
+				exit(0);
 			}
 			isFirst = false;
 		}
@@ -105,8 +93,9 @@ bool insertExpression(const char* validOperators, const char* exits, void** dyna
 					printf("계산식 배열(expression) 메모리 재할당 오류 발생.\n\n");
 					return false;
 				}
-				expression = temp; // realloc 후 다시 대입
-				*dynamicMemory = temp;
+				expression = temp;
+				*expressionPtr = expression;
+				*exprSizePtr = exprSize;
 			}
 
 			expression[exprIdx] = (char)ch;
@@ -163,7 +152,7 @@ bool validateExpression(const char* expression) {
 
 		// 연속 연산자 검사 (예외: +-, --, *-, /-)
 		if (prev != '\0' && ch != '\0' && strchr("+-*/", prev) && strchr("+-*/", ch)) {
-			if (!(prev == '-' && strchr("*/+", ch))) {
+			if (!(ch == '-' && strchr("+-*/", prev))) {
 				printf("연산자 연속 오류 \n\n");
 				return false;
 			}
@@ -190,17 +179,17 @@ bool validateExpression(const char* expression) {
 }
 
 // 연산식 보정 (괄호, 곱셈 누락/생략 등)
-bool normalizeExpression(char* expression, void** dynamicMemory, int exprLen) {
-	int exprSize = exprLen + 1;
+bool normalizeExpression(char* expression, int* exprSizePtr) {
+	int exprSize = *exprSizePtr;
+	int exprLen = strlen(expression);
+	
 	char* temp = (char*)malloc(sizeof(char) * (exprSize * 2));
 	if (!temp) {
 		printf("계산식을 임시 저장할 배열(temp) 메모리 할당 오류.\n\n");
-		free(temp);
 		return false;
 	}
 
 	int j = 0;
-	int exprIdx = j;
 	// 괄호 및 숫자 간 곱셈 보정
 	for (int i = 0; i < exprLen; i++) {
 		char ch = expression[i];
@@ -213,13 +202,13 @@ bool normalizeExpression(char* expression, void** dynamicMemory, int exprLen) {
 		}
 
 		// 1) 숫자 바로 뒤 '(' → * 추가
-		if (isdigit(ch) && next == '(') {
+		if (isdigit((unsigned char)ch) && next == '(') {
 			temp[j++] = ch;
 			temp[j++] = '*';
 		}
 
 		// 2) ')' 바로 뒤 숫자 → * 추가
-		else if (ch == ')' && isdigit(next)) {
+		else if (ch == ')' && isdigit((unsigned char)next)) {
 			temp[j++] = ch;
 			temp[j++] = '*';
 		}
@@ -246,17 +235,20 @@ bool normalizeExpression(char* expression, void** dynamicMemory, int exprLen) {
 			char* temptemp = (char*)realloc(temp, sizeof(char) * exprSize);
 			if (!temptemp) {
 				printf("계산식 배열(expression) 메모리 재할당 오류 발생.\n\n");
+				free(temp);
 				return false;
 			}
-			temp = temptemp; // realloc 후 다시 대입
-			*dynamicMemory = temptemp;
+			temp = temptemp;
 		}
 	}
 	temp[j] = '\0';
-	strcpy(expression, temp);
+	int maxCopySize = *exprSizePtr - 1;
+	strncpy(expression, temp, maxCopySize);
+	expression[maxCopySize] = '\0';
 
+	exprLen = strlen(expression);
 	j = 0;
-	exprLen = (int)strlen(expression);
+
 	// 단항 괄호 제거
 	for (int i = 0; i < exprLen; i++) {
 		char ch = expression[i];
@@ -265,13 +257,9 @@ bool normalizeExpression(char* expression, void** dynamicMemory, int exprLen) {
 			int innerEnd = innerStart;
 
 			// 부호 포함 단항
-			if (expression[innerStart] == '-' || expression[innerStart] == '+')
-				innerEnd++;
-
+			if (expression[innerStart] == '-' || expression[innerStart] == '+') innerEnd++;
 			// 숫자 및 소수점
-			while (isdigit(expression[innerEnd]) || expression[innerEnd] == '.')
-				innerEnd++;
-
+			while (isdigit(expression[innerEnd]) || expression[innerEnd] == '.') innerEnd++;
 			// 단항 괄호이면 내부 내용만 복사
 			if (expression[innerEnd] == ')' && innerEnd > innerStart) {
 				for (int k = innerStart; k < innerEnd; k++)
@@ -284,11 +272,12 @@ bool normalizeExpression(char* expression, void** dynamicMemory, int exprLen) {
 		}
 		temp[j++] = ch;
 	}
-
 	temp[j] = '\0';
-	strcpy(expression, temp);
-	exprLen = (int)strlen(expression);
 
+	strncpy(expression, temp, maxCopySize);
+	expression[maxCopySize] = '\0';
+
+	*exprSizePtr = (int)strlen(expression) + 1;
 	free(temp);
 
 	return true;
@@ -300,6 +289,8 @@ bool getCalculateResult(char* expression, double* finalResult)
 	char* startPtr = NULL;
 	char* endPtr = NULL;
 	int exprLen = strlen(expression);
+	double result = 0.0;
+
 	char* innerExpression = (char*)malloc(sizeof(char) * (exprLen + 1));
 	if (!innerExpression) {
 		printf("괄호 내부 계산식 임시저장 배열(innerExpression) 메모리 재할당 오류 발생.\n\n");
@@ -314,7 +305,7 @@ bool getCalculateResult(char* expression, double* finalResult)
 	strcpy(tempExpression, expression);
 	while ((startPtr = strrchr(expression, '(')) != NULL)
 	{
-		// 2 - 1. 닫힘 괄호가 나오기 전까지를 배열에 담아 계산 함수에 보낸다. 
+		// 닫힘 괄호가 나오기 전까지를 배열에 담아 계산 함수에 보낸다. 
 		endPtr = strchr(startPtr, ')');
 		if (!endPtr) {
 			printf("닫힘 괄호가 없음.\n\n");
@@ -326,9 +317,10 @@ bool getCalculateResult(char* expression, double* finalResult)
 		strncpy(innerExpression, startPtr + 1, innerLen);
 		innerExpression[innerLen] = '\0';
 
-		double result = calculate(innerExpression, strlen(innerExpression));
+		result = calculate(innerExpression);
+		
 
-		// 3. 임시 계산식 배열에 열림 괄호 전, 계산 결과, 닫힘괄호 후 문자들을 합쳐 저장한다. 
+		// 임시 계산식 배열에 열림 괄호 전, 계산 결과, 닫힘괄호 후 문자들을 합쳐 저장한다. 
 		sprintf(tempExpression, "%.*s%.2f%s",
 			(int)(startPtr - expression),
 			expression,
@@ -336,10 +328,11 @@ bool getCalculateResult(char* expression, double* finalResult)
 			endPtr + 1
 		);
 		strcpy(expression, tempExpression);
+		printf("%s", tempExpression);
 	}
 
-	// 2 - 2. 만약 괄호가 없다면 전체를 배열에 담아 계산 함수에 보낸다.
-	double result = calculate(tempExpression, strlen(tempExpression));
+	// 괄호가 없다면 전체를 배열에 담아 계산 함수에 보낸다.
+	result = calculate(tempExpression);
 
 	*finalResult = result;
 	free(innerExpression);
@@ -348,11 +341,11 @@ bool getCalculateResult(char* expression, double* finalResult)
 	return true;
 }
 
-double calculate(const char* expression, int exprLen)
+double calculate(const char* expression)
 {
-	double result = 0.0;
-	double* numbers = (double*)malloc(sizeof(double) * exprLen);
-	char* operators = (char*)malloc(sizeof(char) * exprLen);
+	int exprLen = strlen(expression);
+	double* numbers = (double*)malloc(sizeof(double) * (exprLen + 1));
+	char* operators = (char*)malloc(sizeof(char) * (exprLen + 1));
 	if (!numbers || !operators) {
 		return false;
 	}
@@ -361,7 +354,7 @@ double calculate(const char* expression, int exprLen)
 	int opTop = -1;
 	int i = 0;
 	bool isNegative = false;
-
+	
 	while (expression[i] != '\0') {
 		char ch = expression[i];
 
@@ -373,11 +366,11 @@ double calculate(const char* expression, int exprLen)
 		}
 
 		// 숫자 처리
-		if (isdigit(ch)) {
+		if (isdigit((unsigned char)ch)) {
 			bool isFraction = false;
 			double val = 0;
 			double divisor = 1.0;
-			while (isdigit(expression[i]) || expression[i] == '.') 
+			while (isdigit((unsigned char)expression[i]) || expression[i] == '.')
 			{
 				if (expression[i] == '.') {
 					isFraction = true;
@@ -424,7 +417,11 @@ double calculate(const char* expression, int exprLen)
 		numbers[++numTop] = applyOp(a, b, op);
 	}
 
-	return numbers[numTop];
+	double result = numbers[numTop];
+	free(numbers);
+	free(operators);
+
+	return result;
 }
 
 double applyOp(double a, double b, char op) {
@@ -434,16 +431,6 @@ double applyOp(double a, double b, char op) {
 	case '*': return a * b;
 	case '/': return b != 0 ? a / b : 0;
 	default: return 0;
-	}
-}
-
-void resetProgram(void** dynamicMemorys, int dynamicMemoryCnt)
-{
-	for (int i = 0; i < dynamicMemoryCnt; i++) {
-		if (dynamicMemorys[i]) {
-			free(dynamicMemorys[i]);
-			dynamicMemorys[i] = NULL;
-		}
 	}
 }
 
