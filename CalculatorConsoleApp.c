@@ -235,6 +235,7 @@ bool normalizeExpression(char* expression, int* exprSizePtr) {
 		// 메모리 재할당
 		if (j + 1 > exprSize) {
 			exprSize *= 2;
+			*exprSizePtr = exprSize;
 			char* temptemp = (char*)realloc(temp, sizeof(char) * exprSize);
 			if (!temptemp) {
 				printf("계산식 배열(expression) 메모리 재할당 오류 발생.\n\n");
@@ -331,7 +332,6 @@ bool getCalculateResult(char* expression, double* finalResult)
 			endPtr + 1
 		);
 		strcpy(expression, tempExpression);
-		printf("%s", tempExpression);
 	}
 
 	// 괄호가 없다면 전체를 배열에 담아 계산 함수에 보낸다.
@@ -364,6 +364,11 @@ double calculate(const char* expression)
 		// 음수 부호 처리 (처음이거나 이전이 연산자일 때)
 		if (ch == '-' && (i == 0 || strchr("+-*/", expression[i - 1]))) {
 			isNegative = true;
+			if (expression[i - 1] == '-') {
+				ch = '+';
+				isNegative = true;
+			}
+				
 			i++;
 			continue;
 		}
