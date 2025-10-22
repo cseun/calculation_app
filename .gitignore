@@ -1,10 +1,31 @@
-# Visual Studio 캐시
+# Visual Studio cache / build folders
 .vs/
-
-# 사용자 환경 파일 
-*.vcxproj.user
-
-# 빌드 폴더
+[Bb]in/
+[Oo]bj/
 Debug/
 Release/
 x64/
+x86/
+enc_temp_folder/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.log
+*.tmp
+*.tlog
+
+# Others
+*.ipch
+*.opensdf
+*.VC.db
+*.VC.opendb
