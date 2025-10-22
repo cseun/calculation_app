@@ -6,14 +6,14 @@
 #include <Windows.h>
 #include <math.h>
 
-// ÇÔ¼ö ¼±¾ğ
-bool insertExpression(const char* validOperators, const char* exits, char** expressionPtr, int* exprSizePtr);	// °è»ê½Ä ÀÔ·Â
-bool validateExpression(const char* expression);	// °è»ê½Ä ÇÊÅÍ¸µ
-bool normalizeExpression(char* expression, int* exprSizePtr); // ¿¬»ê½Ä º¸Á¤
-bool getCalculateResult(char* expression, double* result); // °è»ê
+// í•¨ìˆ˜ ì„ ì–¸
+bool insertExpression(const char* validOperators, const char* exits, char** expressionPtr, int* exprSizePtr);	// ê³„ì‚°ì‹ ì…ë ¥
+bool validateExpression(const char* expression);	// ê³„ì‚°ì‹ í•„í„°ë§
+bool normalizeExpression(char* expression, int* exprSizePtr); // ì—°ì‚°ì‹ ë³´ì •
+bool getCalculateResult(char* expression, double* result); // ê³„ì‚°
 double calculate(const char* expression);
 int precedence(char op);
-double applyOp(double a, double b, char op);
+double applyOp(double num1, double num2, char op);
 
 int main()
 {
@@ -22,41 +22,40 @@ int main()
 	int exprSize = 100;
 	char* expression = (char*)malloc(sizeof(char) * exprSize);
 	if (!expression) {
-		printf("°è»ê½Ä ¹è¿­(expression) ¸Ş¸ğ¸® ÇÒ´ç ¿À·ù ¹ß»ı.\n\n");
+		printf("ê³„ì‚°ì‹ ë°°ì—´(expression) ë©”ëª¨ë¦¬ í• ë‹¹ ì˜¤ë¥˜ ë°œìƒ.\n\n");
 		exit(0);
 	}
 
-	printf("== (¡Ü¢§¢£¢§¡Ü) °è»ê±â ÇÁ·Î±×·¥ ==\n");
-	printf("[ ¼³¸í ]\n");
-	printf("°è»êÇÒ ¿¬»ê½ÄÀ» ÀÔ·ÂÇÏ½Ã¿À. (Á¾·á¹®ÀÚ x È¤Àº X)\n");
-	printf("- °¡´ÉÇÑ ¿¬»ê¹®ÀÚ +, -, *, /, °ıÈ£(, )\n");
-	printf("- ¼Ò¼öÁ¡ ÀÚ¸®´Â 2ÀÚ¸®±îÁö Ç¥½ÃµË´Ï´Ù.\n");
-	printf("- Çã¿ëµÈ ¿¬»ê¹®ÀÚ ¿ÜÀÇ ¹®ÀÚ´Â Á¦¿ÜÇÏ°í °è»êµË´Ï´Ù. \n");
-	printf("- Ã¹ ±ÛÀÚ°¡ Á¾·á¹®ÀÚ(X, X)ÀÎ °æ¿ì ÇÁ·Î±×·¥ÀÌ Á¾·áµË´Ï´Ù. \n\n");
+	printf("== (â—Ë‡âˆ€Ë‡â—) ê³„ì‚°ê¸° í”„ë¡œê·¸ë¨ ==\n");
+	printf("[ ì„¤ëª… ]\n");
+	printf("ê³„ì‚°í•  ì—°ì‚°ì‹ì„ ì…ë ¥í•˜ì‹œì˜¤. (ì¢…ë£Œë¬¸ì x í˜¹ì€ X)\n");
+	printf("- ê°€ëŠ¥í•œ ì—°ì‚°ë¬¸ì +, -, *, /, ê´„í˜¸(, )\n");
+	printf("- ì†Œìˆ˜ì  2ìë¦¬ê¹Œì§€ í‘œì‹œë©ë‹ˆë‹¤.\n");
+	printf("- í—ˆìš©ëœ ì—°ì‚°ë¬¸ì ì™¸ì˜ ë¬¸ìëŠ” ì œì™¸í•˜ê³  ê³„ì‚°ë©ë‹ˆë‹¤. \n");
+	printf("- ì²« ê¸€ìê°€ ì¢…ë£Œë¬¸ì(X, X)ì¸ ê²½ìš° í”„ë¡œê·¸ë¨ì´ ì¢…ë£Œë©ë‹ˆë‹¤. \n\n");
 	while (1)
 	{
-		printf("[ °è»ê½Ä ÀÔ·Â ]\n:");
-		//expression ³»ºÎ°ª ÃÊ±âÈ­
+		printf("[ ê³„ì‚°ì‹ ì…ë ¥ ]\n:");
 
 		if (!insertExpression(validOperators, exits, &expression, &exprSize)) continue;
 
-		printf("[ ½ÇÇà °úÁ¤ ]\n");
-		printf("ÀÔ·ÂµÈ °è»ê½Ä(¾Õ/µÚ ¿ÀÅ¸ Á¦¿Ü): %s\n", expression);
+		printf("[ ì‹¤í–‰ ê³¼ì • ]\n");
+		printf("ì…ë ¥ëœ ê³„ì‚°ì‹(ì•/ë’¤ ì˜¤íƒ€ ì œì™¸): %s\n", expression);
 
 		if (!validateExpression(expression)) continue;
-		printf("- ÇÊÅÍ¸µµÈ °è»ê½Ä: %s\n", expression);
+		printf("- í•„í„°ë§ëœ ê³„ì‚°ì‹: %s\n", expression);
 
 		if (!normalizeExpression(expression, &exprSize)) continue;
-		printf("- º¸Á¤µÈ °è»ê½Ä: %s\n", expression);
+		printf("- ë³´ì •ëœ ê³„ì‚°ì‹: %s\n", expression);
 
 		double* result = (double*)malloc(sizeof(double) * exprSize);
 		if (!result) {
-			printf("°è»ê½Ä °á°ú(result) ¸Ş¸ğ¸® ÇÒ´ç ¿À·ù ¹ß»ı.\n\n");
+			printf("ê³„ì‚°ì‹ ê²°ê³¼(result) ë©”ëª¨ë¦¬ í• ë‹¹ ì˜¤ë¥˜ ë°œìƒ.\n\n");
 			continue;
 		}
 		if (!getCalculateResult(expression, result)) continue;
 		
-		printf("°è»ê °á°ú: %.2f\n\n", *result);
+		printf("ê³„ì‚° ê²°ê³¼: %.2f\n\n", *result);
 
 		fflush(stdout);
 	}
@@ -64,7 +63,7 @@ int main()
 	return 1;
 }
 
-// °è»ê½Ä ÀÔ·Â (ºÒÇÊ¿äÇÑ ¾Õ/µÚ ¹®ÀÚ Á¦°Å Æ÷ÇÔ)
+// ê³„ì‚°ì‹ ì…ë ¥ (ë¶ˆí•„ìš”í•œ ì•/ë’¤ ë¬¸ì ì œê±° í¬í•¨)
 bool insertExpression(const char* validOperators, const char* exits, char** expressionPtr, int* exprSizePtr)
 {
 	char* expression = *expressionPtr;
@@ -78,23 +77,23 @@ bool insertExpression(const char* validOperators, const char* exits, char** expr
 	while ((ch = getchar()) != '\n' && ch != EOF) {
 		if (isFirst) {
 			if (strchr(exits, ch)) {
-				printf("ÇÁ·Î±×·¥ÀÌ 2ÃÊ ÈÄ Á¾·áµË´Ï´Ù.");
+				printf("í”„ë¡œê·¸ë¨ì´ 2ì´ˆ í›„ ì¢…ë£Œë©ë‹ˆë‹¤.");
 				Sleep(2000);
 				exit(0);
 			}
 			isFirst = false;
 		}
 
-		// Ã¹ ¹®ÀÚ ºÒ°¡ ¿¬»êÀÚ Á¦°Å
+		// ì²« ë¬¸ì ë¶ˆê°€ ì—°ì‚°ì ì œê±°
 		if (exprIdx == 0 && strchr("+*/)", ch)) continue;
 
 		if (isdigit(ch) || strchr(validOperators, ch)) {
-			// ¸Ş¸ğ¸® ÀçÇÒ´ç
+			// ë©”ëª¨ë¦¬ ì¬í• ë‹¹
 			if (exprIdx + 1 >= exprSize) {
 				exprSize *= 2;
 				char* temp = (char*)realloc(expression, sizeof(char) * exprSize);
 				if (!temp) {
-					printf("°è»ê½Ä ¹è¿­(expression) ¸Ş¸ğ¸® ÀçÇÒ´ç ¿À·ù ¹ß»ı.\n\n");
+					printf("ê³„ì‚°ì‹ ë°°ì—´(expression) ë©”ëª¨ë¦¬ ì¬í• ë‹¹ ì˜¤ë¥˜ ë°œìƒ.\n\n");
 					return false;
 				}
 				expression = temp;
@@ -104,7 +103,7 @@ bool insertExpression(const char* validOperators, const char* exits, char** expr
 
 			expression[exprIdx] = (char)ch;
 
-			// ¸¶Áö¸· ¼ıÀÚ/¿¬»êÀÚ À§Ä¡ °»½Å
+			// ë§ˆì§€ë§‰ ìˆ«ì/ì—°ì‚°ì ìœ„ì¹˜ ê°±ì‹ 
 			if (isdigit(ch)) lastDigit = exprIdx;
 			if (strchr(validOperators, ch)) lastOp = exprIdx;
 
@@ -113,7 +112,7 @@ bool insertExpression(const char* validOperators, const char* exits, char** expr
 	}
 	expression[exprIdx] = '\0';
 
-	// ¸¶Áö¸· ¼ıÀÚ ÀÌÈÄ ºÒÇÊ¿äÇÑ ¿¬»êÀÚ Á¦°Å
+	// ë§ˆì§€ë§‰ ìˆ«ì ì´í›„ ë¶ˆí•„ìš”í•œ ì—°ì‚°ì ì œê±°
 	if (lastDigit != -1 && lastOp > lastDigit) {
 		for (int i = lastDigit + 1; i < exprIdx; i++) {
 			if (expression[i] != ')') {
@@ -127,103 +126,103 @@ bool insertExpression(const char* validOperators, const char* exits, char** expr
 
 	if (ch == EOF && ferror(stdin)) {
 		clearerr(stdin);
-		printf("ÀÔ·Â Áß ¿À·ù ¹ß»ı.\n\n");
+		printf("ì…ë ¥ ì¤‘ ì˜¤ë¥˜ ë°œìƒ.\n\n");
 		return false;
 	}
 
 	if (exprIdx == 0) {
-		printf("ÀÔ·ÂµÈ °è»ê½ÄÀÌ ¾øÀ½.\n\n");
+		printf("ì…ë ¥ëœ ê³„ì‚°ì‹ì´ ì—†ìŒ.\n\n");
 		return false;
 	}
 
 	return true;
 }
 
-// °è»ê½Ä À¯È¿¼º °Ë»ç
+// ê³„ì‚°ì‹ ìœ íš¨ì„± ê²€ì‚¬
 bool validateExpression(const char* expression) {
-	int depth = 0;          // °ıÈ£ ±íÀÌ
-	bool hasDot = false;    // ÇöÀç ¼ıÀÚ ³» ¼Ò¼öÁ¡ Á¸Àç ¿©ºÎ
-	char prev = 0;          // ÀÌÀü ¹®ÀÚ ÀúÀå
+	int depth = 0;          // ê´„í˜¸ ê¹Šì´
+	bool hasDot = false;    // í˜„ì¬ ìˆ«ì ë‚´ ì†Œìˆ˜ì  ì¡´ì¬ ì—¬ë¶€
+	char prev = 0;          // ì´ì „ ë¬¸ì ì €ì¥
 
 	for (int i = 0; expression[i] != '\0'; i++) {
 		char ch = expression[i];
 
-		// °ıÈ£ Â¦ °Ë»ç
+		// ê´„í˜¸ ì§ ê²€ì‚¬
 		if (ch == '(') depth++;
 		else if (ch == ')') depth--;
 
-		if (depth < 0) return false; // ´İÈû °ıÈ£ ÃÊ°ú
+		if (depth < 0) return false; // ë‹«í˜ ê´„í˜¸ ì´ˆê³¼
 
-		// ¿¬¼Ó ¿¬»êÀÚ °Ë»ç (¿¹¿Ü: +-, --, *-, /-)
+		// ì—°ì† ì—°ì‚°ì ê²€ì‚¬ (ì˜ˆì™¸: +-, --, *-, /-)
 		if (prev != '\0' && ch != '\0' && strchr("+-*/", prev) && strchr("+-*/", ch)) {
 			if (!(ch == '-' && strchr("+-*/", prev))) {
-				printf("¿¬»êÀÚ ¿¬¼Ó ¿À·ù \n\n");
+				printf("ì—°ì‚°ì ì—°ì† ì˜¤ë¥˜ \n\n");
 				return false;
 			}
 		}
 
-		// ¼Ò¼öÁ¡ °Ë»ç
+		// ì†Œìˆ˜ì  ê²€ì‚¬
 		if (ch == '.') {
 			if (hasDot || !isdigit(prev)) return false;
 			hasDot = true;
 		}
 		else if (!isdigit(ch)) {
-			hasDot = false; // ¼Ò¼öÁ¡ Æ÷ÇÔ »óÅÂ ¸®¼Â
+			hasDot = false; // ì†Œìˆ˜ì  í¬í•¨ ìƒíƒœ ë¦¬ì…‹
 		}
 
 		prev = ch;
 	}
 
 	if (depth != 0) {
-		printf("°ıÈ£ Â¦ ºÒÀÏÄ¡.\n\n");
+		printf("ê´„í˜¸ ì§ ë¶ˆì¼ì¹˜.\n\n");
 		return false;
 	}
 
 	return true;
 }
 
-// ¿¬»ê½Ä º¸Á¤ (°ıÈ£, °ö¼À ´©¶ô/»ı·« µî)
+// ì—°ì‚°ì‹ ë³´ì • (ê´„í˜¸, ê³±ì…ˆ ëˆ„ë½/ìƒëµ ë“±)
 bool normalizeExpression(char* expression, int* exprSizePtr) {
 	int exprSize = *exprSizePtr;
 	int exprLen = strlen(expression);
 	
 	char* temp = (char*)malloc(sizeof(char) * (exprSize * 2));
 	if (!temp) {
-		printf("°è»ê½ÄÀ» ÀÓ½Ã ÀúÀåÇÒ ¹è¿­(temp) ¸Ş¸ğ¸® ÇÒ´ç ¿À·ù.\n\n");
+		printf("ê³„ì‚°ì‹ì„ ì„ì‹œ ì €ì¥í•  ë°°ì—´(temp) ë©”ëª¨ë¦¬ í• ë‹¹ ì˜¤ë¥˜.\n\n");
 		return false;
 	}
 
 	int j = 0;
-	// °ıÈ£ ¹× ¼ıÀÚ °£ °ö¼À º¸Á¤
+	// ê´„í˜¸ ë° ìˆ«ì ê°„ ê³±ì…ˆ ë³´ì •
 	for (int i = 0; i < exprLen; i++) {
 		char ch = expression[i];
 		char next = (i + 1 < exprLen) ? expression[i + 1] : '\0';
 
-		// 0) ºó °ıÈ£ Á¦°Å
+		// 0) ë¹ˆ ê´„í˜¸ ì œê±°
 		if (ch == '(' && next == ')') {
-			i++; // ºó°ıÈ£ °Ç³Ê¶Ù±â
+			i++; // ë¹ˆê´„í˜¸ ê±´ë„ˆë›°ê¸°
 			continue;
 		}
 
-		// 1) ¼ıÀÚ ¹Ù·Î µÚ '(' ¡æ * Ãß°¡
+		// 1) ìˆ«ì ë°”ë¡œ ë’¤ '(' â†’ * ì¶”ê°€
 		if (isdigit((unsigned char)ch) && next == '(') {
 			temp[j++] = ch;
 			temp[j++] = '*';
 		}
 
-		// 2) ')' ¹Ù·Î µÚ ¼ıÀÚ ¡æ * Ãß°¡
+		// 2) ')' ë°”ë¡œ ë’¤ ìˆ«ì â†’ * ì¶”ê°€
 		else if (ch == ')' && isdigit((unsigned char)next)) {
 			temp[j++] = ch;
 			temp[j++] = '*';
 		}
 
-		// 3) ')' ¹Ù·Î µÚ '(' ¡æ * Ãß°¡
+		// 3) ')' ë°”ë¡œ ë’¤ '(' â†’ * ì¶”ê°€
 		else if (ch == ')' && next == '(') {
 			temp[j++] = ch;
 			temp[j++] = '*';
 		}
 
-		// 4) '-(' ´ÜÇ× À½¼ö °ıÈ£ Ã³¸® ¡æ -1*(...)
+		// 4) '-(' ë‹¨í•­ ìŒìˆ˜ ê´„í˜¸ ì²˜ë¦¬ â†’ -1*(...)
 		else if (ch == '-' && next == '(') {
 			temp[j++] = '-';
 			temp[j++] = '1';
@@ -233,12 +232,12 @@ bool normalizeExpression(char* expression, int* exprSizePtr) {
 			temp[j++] = ch;
 		}
 
-		// ¸Ş¸ğ¸® ÀçÇÒ´ç
+		// ë©”ëª¨ë¦¬ ì¬í• ë‹¹
 		if (j + 1 > exprSize) {
 			exprSize *= 2;
 			char* temptemp = (char*)realloc(temp, sizeof(char) * exprSize);
 			if (!temptemp) {
-				printf("°è»ê½Ä ¹è¿­(expression) ¸Ş¸ğ¸® ÀçÇÒ´ç ¿À·ù ¹ß»ı.\n\n");
+				printf("ê³„ì‚°ì‹ ë°°ì—´(expression) ë©”ëª¨ë¦¬ ì¬í• ë‹¹ ì˜¤ë¥˜ ë°œìƒ.\n\n");
 				free(temp);
 				return false;
 			}
@@ -253,18 +252,18 @@ bool normalizeExpression(char* expression, int* exprSizePtr) {
 	exprLen = strlen(expression);
 	j = 0;
 
-	// ´ÜÇ× °ıÈ£ Á¦°Å
+	// ë‹¨í•­ ê´„í˜¸ ì œê±°
 	for (int i = 0; i < exprLen; i++) {
 		char ch = expression[i];
 		if (ch == '(') {
 			int innerStart = i + 1;
 			int innerEnd = innerStart;
 
-			// ºÎÈ£ Æ÷ÇÔ ´ÜÇ×
+			// ë¶€í˜¸ í¬í•¨ ë‹¨í•­
 			if (expression[innerStart] == '-' || expression[innerStart] == '+') innerEnd++;
-			// ¼ıÀÚ ¹× ¼Ò¼öÁ¡
+			// ìˆ«ì ë° ì†Œìˆ˜ì 
 			while (isdigit(expression[innerEnd]) || expression[innerEnd] == '.') innerEnd++;
-			// ´ÜÇ× °ıÈ£ÀÌ¸é ³»ºÎ ³»¿ë¸¸ º¹»ç
+			// ë‹¨í•­ ê´„í˜¸ì´ë©´ ë‚´ë¶€ ë‚´ìš©ë§Œ ë³µì‚¬
 			if (expression[innerEnd] == ')' && innerEnd > innerStart) {
 				for (int k = innerStart; k < innerEnd; k++)
 				{
@@ -287,7 +286,7 @@ bool normalizeExpression(char* expression, int* exprSizePtr) {
 	return true;
 }
 
-// °è»ê
+// ê³„ì‚°
 bool getCalculateResult(char* expression, double* finalResult)
 {
 	char* startPtr = NULL;
@@ -297,26 +296,26 @@ bool getCalculateResult(char* expression, double* finalResult)
 
 	char* innerExpression = (char*)malloc(sizeof(char) * (exprLen + 1));
 	if (!innerExpression) {
-		printf("°ıÈ£ ³»ºÎ °è»ê½Ä ÀÓ½ÃÀúÀå ¹è¿­(innerExpression) ¸Ş¸ğ¸® ÀçÇÒ´ç ¿À·ù ¹ß»ı.\n\n");
+		printf("ê´„í˜¸ ë‚´ë¶€ ê³„ì‚°ì‹ ì„ì‹œì €ì¥ ë°°ì—´(innerExpression) ë©”ëª¨ë¦¬ ì¬í• ë‹¹ ì˜¤ë¥˜ ë°œìƒ.\n\n");
 		return false;
 	}
 	char* tempExpression = (char*)malloc(sizeof(char) * (exprLen * 2 + 1));
 	if (!tempExpression) {
-		printf("°è»ê½Ä ÀÓ½ÃÀúÀå ¹è¿­(tempExpression) ¸Ş¸ğ¸® ÀçÇÒ´ç ¿À·ù ¹ß»ı.\n\n");
+		printf("ê³„ì‚°ì‹ ì„ì‹œì €ì¥ ë°°ì—´(tempExpression) ë©”ëª¨ë¦¬ ì¬í• ë‹¹ ì˜¤ë¥˜ ë°œìƒ.\n\n");
 		return false;
 	}
 
 	strcpy(tempExpression, expression);
 	while ((startPtr = strrchr(expression, '(')) != NULL)
 	{
-		// ´İÈû °ıÈ£°¡ ³ª¿À±â Àü±îÁö¸¦ ¹è¿­¿¡ ´ã¾Æ °è»ê ÇÔ¼ö¿¡ º¸³½´Ù. 
+		// ë‹«í˜ ê´„í˜¸ê°€ ë‚˜ì˜¤ê¸° ì „ê¹Œì§€ë¥¼ ë°°ì—´ì— ë‹´ì•„ ê³„ì‚° í•¨ìˆ˜ì— ë³´ë‚¸ë‹¤. 
 		endPtr = strchr(startPtr, ')');
 		if (!endPtr) {
-			printf("´İÈû °ıÈ£°¡ ¾øÀ½.\n\n");
+			printf("ë‹«í˜ ê´„í˜¸ê°€ ì—†ìŒ.\n\n");
 			return false;
 		}
 
-		// ³»ºÎ °è»ê½Ä ÃßÃâ
+		// ë‚´ë¶€ ê³„ì‚°ì‹ ì¶”ì¶œ
 		int innerLen = endPtr - startPtr - 1;
 		strncpy(innerExpression, startPtr + 1, innerLen);
 		innerExpression[innerLen] = '\0';
@@ -324,7 +323,7 @@ bool getCalculateResult(char* expression, double* finalResult)
 		result = calculate(innerExpression);
 		
 
-		// ÀÓ½Ã °è»ê½Ä ¹è¿­¿¡ ¿­¸² °ıÈ£ Àü, °è»ê °á°ú, ´İÈû°ıÈ£ ÈÄ ¹®ÀÚµéÀ» ÇÕÃÄ ÀúÀåÇÑ´Ù. 
+		// ì„ì‹œ ê³„ì‚°ì‹ ë°°ì—´ì— ì—´ë¦¼ ê´„í˜¸ ì „, ê³„ì‚° ê²°ê³¼, ë‹«í˜ê´„í˜¸ í›„ ë¬¸ìë“¤ì„ í•©ì³ ì €ì¥í•œë‹¤. 
 		sprintf(tempExpression, "%.*s%.2f%s",
 			(int)(startPtr - expression),
 			expression,
@@ -335,7 +334,7 @@ bool getCalculateResult(char* expression, double* finalResult)
 		printf("%s", tempExpression);
 	}
 
-	// °ıÈ£°¡ ¾ø´Ù¸é ÀüÃ¼¸¦ ¹è¿­¿¡ ´ã¾Æ °è»ê ÇÔ¼ö¿¡ º¸³½´Ù.
+	// ê´„í˜¸ê°€ ì—†ë‹¤ë©´ ì „ì²´ë¥¼ ë°°ì—´ì— ë‹´ì•„ ê³„ì‚° í•¨ìˆ˜ì— ë³´ë‚¸ë‹¤.
 	result = calculate(tempExpression);
 
 	*finalResult = round(result * 100.0) / 100.0;;
@@ -362,14 +361,14 @@ double calculate(const char* expression)
 	while (expression[i] != '\0') {
 		char ch = expression[i];
 
-		// À½¼ö ºÎÈ£ Ã³¸® (Ã³À½ÀÌ°Å³ª ÀÌÀüÀÌ ¿¬»êÀÚÀÏ ¶§)
+		// ìŒìˆ˜ ë¶€í˜¸ ì²˜ë¦¬ (ì²˜ìŒì´ê±°ë‚˜ ì´ì „ì´ ì—°ì‚°ìì¼ ë•Œ)
 		if (ch == '-' && (i == 0 || strchr("+-*/", expression[i - 1]))) {
 			isNegative = true;
 			i++;
 			continue;
 		}
 
-		// ¼ıÀÚ Ã³¸®
+		// ìˆ«ì ì²˜ë¦¬
 		if (isdigit((unsigned char)ch)) {
 			bool isFraction = false;
 			double val = 0;
@@ -399,13 +398,13 @@ double calculate(const char* expression)
 			continue;
 		}
 
-		// ¿¬»êÀÚ Ã³¸®
+		// ì—°ì‚°ì ì²˜ë¦¬
 		if (strchr("+-*/", ch)) {
 			while (opTop >= 0 && precedence(operators[opTop]) >= precedence(ch)) {
-				double b = numbers[numTop--];
-				double a = numbers[numTop--];
+				double num1 = numbers[numTop--];
+				double num2 = numbers[numTop--];
 				char op = operators[opTop--];
-				numbers[++numTop] = applyOp(a, b, op);
+				numbers[++numTop] = applyOp(num1, num2, op);
 			}
 			operators[++opTop] = ch;
 		}
@@ -413,12 +412,12 @@ double calculate(const char* expression)
 		i++;
 	}
 
-	// ³²Àº ¿¬»ê Ã³¸®
+	// ë‚¨ì€ ì—°ì‚° ì²˜ë¦¬
 	while (opTop >= 0) {
-		double b = numbers[numTop--];
-		double a = numbers[numTop--];
+		double num1 = numbers[numTop--];
+		double num2 = numbers[numTop--];
 		char op = operators[opTop--];
-		numbers[++numTop] = applyOp(a, b, op);
+		numbers[++numTop] = applyOp(num1, num2, op);
 	}
 
 	double result = numbers[numTop];
@@ -428,12 +427,12 @@ double calculate(const char* expression)
 	return result;
 }
 
-double applyOp(double a, double b, char op) {
+double applyOp(double num1, double num2, char op) {
 	switch (op) {
-	case '+': return a + b;
-	case '-': return a - b;
-	case '*': return a * b;
-	case '/': return b != 0 ? a / b : 0;
+	case '+': return num1 + num2;
+	case '-': return num1 - num2;
+	case '*': return num1 * num2;
+	case '/': return num2 != 0 ? num1 / num2 : 0;
 	default: return 0;
 	}
 }
