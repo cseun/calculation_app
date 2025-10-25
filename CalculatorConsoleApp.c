@@ -25,6 +25,7 @@ int main()
 		printf("계산식 배열(expression) 메모리 할당 오류 발생.\n\n");
 		exit(0);
 	}
+	double result = 0;
 
 	printf("== (●ˇ∀ˇ●) 계산기 프로그램 ==\n");
 	printf("[ 설명 ]\n");
@@ -48,15 +49,10 @@ int main()
 		if (!normalizeExpression(expression, &exprSize)) continue;
 		printf("- 보정된 계산식: %s\n", expression);
 
-		double* result = (double*)malloc(sizeof(double) * exprSize);
-		if (!result) {
-			printf("계산식 결과(result) 메모리 할당 오류 발생.\n\n");
-			continue;
-		}
-		if (!getCalculateResult(expression, result)) continue;
+		if (!getCalculateResult(expression, &result)) continue;
 		
-		printf("계산 결과: %.2f\n\n", *result);
-
+		printf("계산 결과: %.2f\n\n", result);
+		
 		fflush(stdout);
 	}
 
@@ -163,7 +159,10 @@ bool validateExpression(const char* expression) {
 
 		// 소수점 검사
 		if (ch == '.') {
-			if (hasDot || !isdigit(prev)) return false;
+			if (hasDot || !isdigit(prev)) {
+				printf("소수점 위치가 잘못됨.\n\n");
+				return false;
+			}
 			hasDot = true;
 		}
 		else if (!isdigit(ch)) {
@@ -184,16 +183,17 @@ bool validateExpression(const char* expression) {
 // 연산식 보정 (괄호, 곱셈 누락/생략 등)
 bool normalizeExpression(char* expression, int* exprSizePtr) {
 	int exprSize = *exprSizePtr;
+	*exprSizePtr = exprSize;
 	int exprLen = strlen(expression);
 	
-	char* temp = (char*)malloc(sizeof(char) * (exprSize * 2));
+	char* temp = (char*)malloc(sizeof(char) * exprSize);
 	if (!temp) {
 		printf("계산식을 임시 저장할 배열(temp) 메모리 할당 오류.\n\n");
 		return false;
 	}
 
 	int j = 0;
-	// 괄호 및 숫자 간 곱셈 보정
+	// 괄호 및 숫자 간 곱셈 생략 보정
 	for (int i = 0; i < exprLen; i++) {
 		char ch = expression[i];
 		char next = (i + 1 < exprLen) ? expression[i + 1] : '\0';
@@ -234,12 +234,12 @@ bool normalizeExpression(char* expression, int* exprSizePtr) {
 
 		// 메모리 재할당
 		if (j + 1 > exprSize) {
-			exprSize *= 2;
+			exprSize += 2;
 			*exprSizePtr = exprSize;
 			char* temptemp = (char*)realloc(temp, sizeof(char) * exprSize);
 			if (!temptemp) {
-				printf("계산식 배열(expression) 메모리 재할당 오류 발생.\n\n");
 				free(temp);
+				printf("계산식 배열(expression) 메모리 재할당 오류 발생.\n\n");
 				return false;
 			}
 			temp = temptemp;
@@ -252,17 +252,16 @@ bool normalizeExpression(char* expression, int* exprSizePtr) {
 
 	exprLen = strlen(expression);
 	j = 0;
-
-	// 단항 괄호 제거
+	// 단항 괄호 제거 
 	for (int i = 0; i < exprLen; i++) {
 		char ch = expression[i];
 		if (ch == '(') {
 			int innerStart = i + 1;
 			int innerEnd = innerStart;
 
-			// 부호 포함 단항
+			// 단항 부호 포함
 			if (expression[innerStart] == '-' || expression[innerStart] == '+') innerEnd++;
-			// 숫자 및 소수점
+			// 숫자 및 소수점 포함
 			while (isdigit(expression[innerEnd]) || expression[innerEnd] == '.') innerEnd++;
 			// 단항 괄호이면 내부 내용만 복사
 			if (expression[innerEnd] == ')' && innerEnd > innerStart) {
@@ -281,7 +280,7 @@ bool normalizeExpression(char* expression, int* exprSizePtr) {
 	strncpy(expression, temp, maxCopySize);
 	expression[maxCopySize] = '\0';
 
-	*exprSizePtr = (int)strlen(expression) + 1;
+	*exprSizePtr = maxCopySize;
 	free(temp);
 
 	return true;
@@ -348,29 +347,39 @@ double calculate(const char* expression)
 {
 	int exprLen = strlen(expression);
 	double* numbers = (double*)malloc(sizeof(double) * (exprLen + 1));
+	if (!numbers) {
+		printf("피연산자 배열(numbers) 메모리 할당 오류 발생.\n\n");
+		return 0;
+	}
+
 	char* operators = (char*)malloc(sizeof(char) * (exprLen + 1));
-	if (!numbers || !operators) {
-		return false;
+	if (!operators) {
+		printf("연산자 배열(operators) 메모리 할당 오류 발생.\n\n");
+		return 0;
 	}
 
 	int numTop = -1;
 	int opTop = -1;
 	int i = 0;
 	bool isNegative = false;
-	
+
 	while (expression[i] != '\0') {
 		char ch = expression[i];
-
 		// 음수 부호 처리 (처음이거나 이전이 연산자일 때)
-		if (ch == '-' && (i == 0 || strchr("+-*/", expression[i - 1]))) {
-			isNegative = true;
-			if (expression[i - 1] == '-') {
-				ch = '+';
+		if (ch == '-') {
+			if (i == 0 || strchr("+*/", expression[i - 1])){
 				isNegative = true;
+				i++;
+				continue;
 			}
-				
-			i++;
-			continue;
+			else if (expression[i + 1] == '-') {
+				printf("%d\n", 3);
+				i++;
+				continue;
+			}
+			else if (expression[i - 1] == '-') {
+				ch = '+';
+			}
 		}
 
 		// 숫자 처리
@@ -409,7 +418,7 @@ double calculate(const char* expression)
 				double num1 = numbers[numTop--];
 				double num2 = numbers[numTop--];
 				char op = operators[opTop--];
-				numbers[++numTop] = applyOp(num1, num2, op);
+				numbers[++numTop] = applyOp(num2, num1, op);
 			}
 			operators[++opTop] = ch;
 		}
@@ -422,7 +431,7 @@ double calculate(const char* expression)
 		double num1 = numbers[numTop--];
 		double num2 = numbers[numTop--];
 		char op = operators[opTop--];
-		numbers[++numTop] = applyOp(num1, num2, op);
+		numbers[++numTop] = applyOp(num2, num1, op);
 	}
 
 	double result = numbers[numTop];
